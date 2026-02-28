@@ -6,7 +6,7 @@ local CoreGui = game:GetService("CoreGui")
 
 local FILE_NAME = "NoNameHub.json"
 local boostEnabled = false
-local boostSpeed = 32 
+local boostSpeed = 31 -- Precision tuned to slip under the radar
 
 local function loadPosition()
     if readfile and isfile and isfile(FILE_NAME) then
@@ -118,10 +118,8 @@ credit.TextSize = 8
 credit.TextColor3 = Color3.fromRGB(110,110,110)
 credit.TextXAlignment = Enum.TextXAlignment.Right
 
--- BODY VELOCITY STABILIZER
-local bv = Instance.new("BodyVelocity")
-bv.MaxForce = Vector3.new(0, 0, 0) -- Starts disabled
-bv.Velocity = Vector3.new(0, 0, 0)
+-- MICRO-BURST VELOCITY LOGIC
+local burstCounter = 0
 
 RunService.Heartbeat:Connect(function()
     local color = Color3.fromHSV(tick() % 5 / 5, 1, 1)
@@ -133,18 +131,23 @@ RunService.Heartbeat:Connect(function()
     rejoinStroke.Color = color
     leaveStroke.Color = color
 
-    local char = player.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    
-    if root and hum then
-        bv.Parent = root -- Keep it attached
-        if boostEnabled and hum.MoveDirection.Magnitude > 0 then
-            -- Set force to high on X and Z, but 0 on Y (to let gravity work)
-            bv.MaxForce = Vector3.new(100000, 0, 100000)
-            bv.Velocity = hum.MoveDirection * boostSpeed
-        else
-            bv.MaxForce = Vector3.new(0, 0, 0)
+    if boostEnabled then
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        
+        if root and hum then
+            if hum.MoveDirection.Magnitude > 0 then
+                burstCounter = burstCounter + 1
+                
+                -- Only apply force 4 out of every 5 frames
+                -- This "stutters" the velocity so it doesn't look like a constant cheat
+                if burstCounter % 5 ~= 0 then
+                    root.AssemblyLinearVelocity = Vector3.new(hum.MoveDirection.X * boostSpeed, root.AssemblyLinearVelocity.Y, hum.MoveDirection.Z * boostSpeed)
+                end
+            else
+                root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
+            end
         end
     end
 end)
