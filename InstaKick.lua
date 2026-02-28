@@ -6,7 +6,7 @@ local CoreGui = game:GetService("CoreGui")
 
 local FILE_NAME = "NoNameHub.json"
 local boostEnabled = false
-local boostSpeed = 32 -- Optimized for maximum force with zero lag-back
+local boostSpeed = 31 -- The absolute limit for most server-side checks
 
 local function loadPosition()
     if readfile and isfile and isfile(FILE_NAME) then
@@ -118,8 +118,8 @@ credit.TextSize = 8
 credit.TextColor3 = Color3.fromRGB(110,110,110)
 credit.TextXAlignment = Enum.TextXAlignment.Right
 
--- GOD-MODE SPEED METHOD
-RunService.PreSimulation:Connect(function(delta)
+-- ANTI-LAGBACK STEALTH METHOD
+RunService.PreRender:Connect(function(delta)
     local color = Color3.fromHSV(tick() % 5 / 5, 1, 1)
     frameStroke.Color = color
     minStroke.Color = color
@@ -136,16 +136,13 @@ RunService.PreSimulation:Connect(function(delta)
         
         if root and hum then
             if hum.MoveDirection.Magnitude > 0 then
-                -- Force state to Running to prevent "Slowdown" animations
-                hum:ChangeState(Enum.HumanoidStateType.Running)
-                
-                -- The "God" Shove: Move CFrame slightly and match Velocity perfectly
-                local vel = hum.MoveDirection * boostSpeed
-                root.AssemblyLinearVelocity = Vector3.new(vel.X, root.AssemblyLinearVelocity.Y, vel.Z)
-                root.CFrame = root.CFrame + (hum.MoveDirection * (boostSpeed * delta * 0.45))
-            else
-                -- Stop immediately when keys are released to avoid sliding into lag-back
+                -- Disable standard physics velocity to hide from server "Speed" checks
                 root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
+                
+                -- Shift position directly (CFrame)
+                -- 31 speed / 60 fps = ~0.5 studs per frame (Stealthy)
+                local moveVec = hum.MoveDirection * (boostSpeed * delta)
+                root.CFrame = root.CFrame + moveVec
             end
         end
     end
