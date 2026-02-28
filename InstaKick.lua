@@ -76,6 +76,11 @@ local function createToggle(prop, text)
     btn.MouseButton1Click:Connect(function()
         config[prop] = not config[prop]
         btn.Text = text .. ": " .. (config[prop] and "ON" or "OFF")
+        -- Fix: Instantly clear velocity if turning off speed
+        if prop == "boostEnabled" and not config[prop] then
+            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if root then root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0) end
+        end
         saveSettings()
     end)
     return btn, str
@@ -99,29 +104,26 @@ local eBtn, eStr = createToggle("espEnabled", "PLAYER ESP")
 local rBtn, rStr = createToggle("antiRagdoll", "ANTI RAGDOLL")
 local kBtn, kStr = createToggle("antiKB", "ANTI KNOCKBACK")
 
--- CLEAN SPEED LOOP
-RunService.PostSimulation:Connect(function()
-    local char = player.Character; local root = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum and root then
-        if config.boostEnabled and hum.MoveDirection.Magnitude > 0 then
-            -- Cleanly move the player without leaving behind "sticky" velocity
-            root.Velocity = (hum.MoveDirection * config.speed) + Vector3.new(0, root.Velocity.Y, 0)
-        end
-    end
-end)
-
--- RAINBOW & CORE
+-- MAIN LOOP (REVERTED TO "PERFECT" SPEED METHOD)
 RunService.Stepped:Connect(function()
     local color = Color3.fromHSV(tick() % 5 / 5, 0.8, 1)
     frameStroke.Color = color; minStroke.Color = color; knob.BackgroundColor3 = color; sliderFill.BackgroundColor3 = color
     resS.Color = color; rejS.Color = color; leaS.Color = color; bStr.Color = color; sStr.Color = color; eStr.Color = color; rStr.Color = color; kStr.Color = color
 
-    local char = player.Character; local hum = char and char:FindFirstChildOfClass("Humanoid"); local root = char and char:FindFirstChild("HumanoidRootPart")
+    local char = player.Character; local root = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum and root then
-        if config.antiRagdoll then hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false); hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end
-        if config.antiKB and not config.boostEnabled and not config.infJumpEnabled then
-            root.Velocity = Vector3.new(0, root.Velocity.Y, 0)
+        -- SPEED (Reverted to your working Lerp version)
+        if config.boostEnabled and hum.MoveDirection.Magnitude > 0 then
+            root.AssemblyLinearVelocity = Vector3.new(hum.MoveDirection.X * config.speed, root.AssemblyLinearVelocity.Y, hum.MoveDirection.Z * config.speed)
         end
+        
+        -- ANTI SLOW FIX
+        if not config.boostEnabled and hum.WalkSpeed < 16 then
+            hum.WalkSpeed = 16
+        end
+
+        if config.antiRagdoll then hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false); hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end
+        if config.antiKB and not config.boostEnabled then root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0) end
     end
 end)
 
@@ -151,16 +153,13 @@ end
 for _, p in pairs(game.Players:GetPlayers()) do applyESP(p) end
 game.Players.PlayerAdded:Connect(applyESP)
 
--- ANTI-PULLBACK INF JUMP
+-- PURE VELOCITY INF JUMP (REVERTED TO BEST VERSION)
 UserInputService.JumpRequest:Connect(function()
     if config.infJumpEnabled and player.Character then
         local root = player.Character:FindFirstChild("HumanoidRootPart")
         if root then
-            -- Reset Y velocity to 0 to stop any "downward pull" from the anti-cheat
-            root.Velocity = Vector3.new(root.Velocity.X, 0, root.Velocity.Z)
-            -- Small CFrame nudge + Pure Velocity Jump
-            root.CFrame = root.CFrame * CFrame.new(0, 0.1, 0)
-            root.Velocity = root.Velocity + Vector3.new(0, 52, 0)
+            -- Set upward velocity immediately without stacking forces
+            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 55, root.AssemblyLinearVelocity.Z)
         end
     end
 end)
