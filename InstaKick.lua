@@ -32,7 +32,7 @@ local screenGui = Instance.new("ScreenGui", CoreGui)
 screenGui.Name = "NoNameHub"; screenGui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame", screenGui)
-frame.Size = UDim2.new(0, 190, 0, 275) 
+frame.Size = UDim2.new(0, 190, 0, 290) 
 frame.Position = UDim2.new(config.pos[1], config.pos[2], config.pos[3], config.pos[4])
 frame.BackgroundColor3 = Color3.fromRGB(12,12,12); frame.BorderSizePixel = 0; frame.Active = true; frame.Draggable = true; frame.Visible = not config.minimized
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
@@ -42,7 +42,7 @@ local frameStroke = Instance.new("UIStroke", frame); frameStroke.Thickness = 1.5
 local scroll = Instance.new("ScrollingFrame", frame)
 scroll.Size = UDim2.new(1, 0, 1, -50); scroll.Position = UDim2.new(0, 0, 0, 30)
 scroll.BackgroundTransparency = 1; scroll.BorderSizePixel = 0; scroll.ScrollBarThickness = 2
-scroll.CanvasSize = UDim2.new(0, 0, 0, 580) 
+scroll.CanvasSize = UDim2.new(0, 0, 0, 520) 
 
 local layout = Instance.new("UIListLayout", scroll)
 layout.HorizontalAlignment = Enum.HorizontalAlignment.Center; layout.Padding = UDim.new(0, 8); layout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -84,7 +84,7 @@ local rejB, rejS = createUtil("REJOIN")
 local leaB, leaS = createUtil("LEAVE")
 local bBtn, bStr = createToggle("boostEnabled", "SPEED BOOST")
 local lockBtn, lockStr = createUtil(config.sliderLocked and "UNLOCK SLIDER" or "LOCK SLIDER")
-lockBtn.Size = UDim2.new(0.85, 0, 0, 28)
+lockBtn.Size = UDim2.new(0.85, 0, 0, 25)
 
 -- SLIDER
 local sliderFrame = Instance.new("Frame", scroll); sliderFrame.Size = UDim2.new(0.85, 0, 0, 10); sliderFrame.BackgroundColor3 = Color3.fromRGB(45,45,45); sliderFrame.BorderSizePixel = 0; Instance.new("UICorner", sliderFrame)
@@ -92,12 +92,19 @@ local sliderFill = Instance.new("Frame", sliderFrame); sliderFill.Size = UDim2.n
 local knob = Instance.new("Frame", sliderFrame); knob.Size = UDim2.new(0, 18, 0, 18); knob.Position = UDim2.new(((config.speed-16)/34), -9, 0.5, -9); knob.BackgroundColor3 = Color3.new(1,1,1); Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
 local speedValueLabel = Instance.new("TextLabel", scroll); speedValueLabel.Size = UDim2.new(0.85, 0, 0, 15); speedValueLabel.BackgroundTransparency = 1; speedValueLabel.Text = "Speed: "..config.speed.." (Safe: <32)"; speedValueLabel.Font = Enum.Font.GothamMedium; speedValueLabel.TextSize = 9; speedValueLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
 
+lockBtn.MouseButton1Click:Connect(function()
+    config.sliderLocked = not config.sliderLocked
+    lockBtn.Text = config.sliderLocked and "UNLOCK SLIDER" or "LOCK SLIDER"
+    sliderFrame.BackgroundTransparency = config.sliderLocked and 0.5 or 0
+    saveSettings()
+end)
+
 local sBtn, sStr = createToggle("infJumpEnabled", "INF JUMP")
 local eBtn, eStr = createToggle("espEnabled", "PLAYER ESP")
 local rBtn, rStr = createToggle("antiRagdoll", "ANTI RAGDOLL")
 local kBtn, kStr = createToggle("antiKB", "ANTI KNOCKBACK")
 
--- ENGINE
+-- CORE LOOP
 RunService.Stepped:Connect(function()
     local color = config.sliderLocked and Color3.fromRGB(255, 50, 50) or Color3.fromHSV(tick() % 5 / 5, 0.8, 1)
     frameStroke.Color = color; minStroke.Color = color; knob.BackgroundColor3 = color; sliderFill.BackgroundColor3 = color
@@ -115,20 +122,21 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- INF JUMP (FIXED HEIGHT & HAND ANIMATIONS)
+-- INF JUMP (SYNCED + PULLBACK FIX)
 UserInputService.JumpRequest:Connect(function()
     if config.infJumpEnabled and player.Character then
         local root = player.Character:FindFirstChild("HumanoidRootPart")
-        if root then 
-            -- Apply direct velocity without task.wait() to keep height high
-            -- Magnitude 65 is high, but avoids the "Void Kill" check
-            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 65, root.AssemblyLinearVelocity.Z) 
+        local hum = player.Character:FindFirstChildOfClass("Humanoid")
+        if root and hum then 
+            -- Synced Velocity
+            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 58, root.AssemblyLinearVelocity.Z) 
+            -- State Change (Forces server to accept the vertical move)
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
         end
     end
 end)
 
 -- SLIDER LOGIC
-lockBtn.MouseButton1Click:Connect(function() config.sliderLocked = not config.sliderLocked; lockBtn.Text = config.sliderLocked and "UNLOCK SLIDER" or "LOCK SLIDER"; saveSettings() end)
 local isSliding = false
 local function updateSlider(input)
     if config.sliderLocked then return end
@@ -154,6 +162,7 @@ local function applyESP(plr)
 end
 for _, p in pairs(game.Players:GetPlayers()) do applyESP(p) end
 game.Players.PlayerAdded:Connect(applyESP)
+
 resB.MouseButton1Click:Connect(function() if player.Character and player.Character:FindFirstChild("Humanoid") then player.Character.Humanoid.Health = 0 end end)
 rejB.MouseButton1Click:Connect(function() TeleportService:Teleport(game.PlaceId, player) end)
 leaB.MouseButton1Click:Connect(function() player:Kick("kicked by mrfunnynutz") end)
