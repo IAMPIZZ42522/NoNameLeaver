@@ -28,17 +28,12 @@ loadSettings()
 local function saveSettings() if writefile then writefile(FILE_NAME, HttpService:JSONEncode(config)) end end
 
 local screenGui = Instance.new("ScreenGui", CoreGui)
-screenGui.Name = "NoNameHub"
-screenGui.ResetOnSpawn = false
+screenGui.Name = "NoNameHub"; screenGui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame", screenGui)
 frame.Size = UDim2.new(0, 190, 0, 275) 
 frame.Position = UDim2.new(config.pos[1], config.pos[2], config.pos[3], config.pos[4])
-frame.BackgroundColor3 = Color3.fromRGB(12,12,12)
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
-frame.Visible = not config.minimized
+frame.BackgroundColor3 = Color3.fromRGB(12,12,12); frame.BorderSizePixel = 0; frame.Active = true; frame.Draggable = true; frame.Visible = not config.minimized
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
 local frameStroke = Instance.new("UIStroke", frame); frameStroke.Thickness = 1.5
 
@@ -81,17 +76,12 @@ local function createToggle(prop, text)
     btn.MouseButton1Click:Connect(function()
         config[prop] = not config[prop]
         btn.Text = text .. ": " .. (config[prop] and "ON" or "OFF")
-        -- FIX: Reset velocity instantly when turning OFF speed
-        if prop == "boostEnabled" and not config[prop] then
-            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-            if root then root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0) end
-        end
         saveSettings()
     end)
     return btn, str
 end
 
--- 1. TOP UTILITY
+-- 1. UTILITY
 local resB, resS = createUtil("RESPAWN")
 local rejB, rejS = createUtil("REJOIN")
 local leaB, leaS = createUtil("LEAVE")
@@ -103,33 +93,39 @@ local sliderFill = Instance.new("Frame", sliderFrame); sliderFill.Size = UDim2.n
 local knob = Instance.new("Frame", sliderFrame); knob.Size = UDim2.new(0, 18, 0, 18); knob.BackgroundColor3 = Color3.new(1,1,1); Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
 local speedValueLabel = Instance.new("TextLabel", scroll); speedValueLabel.Size = UDim2.new(0.85, 0, 0, 15); speedValueLabel.BackgroundTransparency = 1; speedValueLabel.Text = "Speed: "..config.speed.." (Safe: <32)"; speedValueLabel.Font = Enum.Font.GothamMedium; speedValueLabel.TextSize = 9; speedValueLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
 
--- 3. ELITE TOGGLES
+-- 3. ELITE
 local sBtn, sStr = createToggle("infJumpEnabled", "INF JUMP")
 local eBtn, eStr = createToggle("espEnabled", "PLAYER ESP")
 local rBtn, rStr = createToggle("antiRagdoll", "ANTI RAGDOLL")
 local kBtn, kStr = createToggle("antiKB", "ANTI KNOCKBACK")
 
--- ENGINE (FIXED SLOWDOWN ERROR)
+-- CLEAN SPEED LOOP
+RunService.PostSimulation:Connect(function()
+    local char = player.Character; local root = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum and root then
+        if config.boostEnabled and hum.MoveDirection.Magnitude > 0 then
+            -- Cleanly move the player without leaving behind "sticky" velocity
+            root.Velocity = (hum.MoveDirection * config.speed) + Vector3.new(0, root.Velocity.Y, 0)
+        end
+    end
+end)
+
+-- RAINBOW & CORE
 RunService.Stepped:Connect(function()
     local color = Color3.fromHSV(tick() % 5 / 5, 0.8, 1)
     frameStroke.Color = color; minStroke.Color = color; knob.BackgroundColor3 = color; sliderFill.BackgroundColor3 = color
     resS.Color = color; rejS.Color = color; leaS.Color = color; bStr.Color = color; sStr.Color = color; eStr.Color = color; rStr.Color = color; kStr.Color = color
 
-    local char = player.Character; local root = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local char = player.Character; local hum = char and char:FindFirstChildOfClass("Humanoid"); local root = char and char:FindFirstChild("HumanoidRootPart")
     if hum and root then
-        if config.boostEnabled and hum.MoveDirection.Magnitude > 0 then
-            root.AssemblyLinearVelocity = root.AssemblyLinearVelocity:Lerp(Vector3.new(hum.MoveDirection.X * config.speed, root.AssemblyLinearVelocity.Y, hum.MoveDirection.Z * config.speed), 0.75)
-        elseif not config.boostEnabled and hum.MoveDirection.Magnitude > 0 then
-            -- Error Fix: Ensure character doesn't stay slow when turning off boost
-            if hum.WalkSpeed < 16 then hum.WalkSpeed = 16 end
-        end
-        
         if config.antiRagdoll then hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false); hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end
-        if config.antiKB and not config.boostEnabled then root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0) end
+        if config.antiKB and not config.boostEnabled and not config.infJumpEnabled then
+            root.Velocity = Vector3.new(0, root.Velocity.Y, 0)
+        end
     end
 end)
 
--- SLIDER LOGIC
+-- SLIDER
 local isSliding = false
 local function updateSlider(input)
     local p = math.clamp((input.Position.X - sliderFrame.AbsolutePosition.X) / sliderFrame.AbsoluteSize.X, 0, 1)
@@ -155,24 +151,16 @@ end
 for _, p in pairs(game.Players:GetPlayers()) do applyESP(p) end
 game.Players.PlayerAdded:Connect(applyESP)
 
--- FIXED INF JUMP (NO STACKING ERROR)
-local jumping = false
+-- ANTI-PULLBACK INF JUMP
 UserInputService.JumpRequest:Connect(function()
-    if config.infJumpEnabled and player.Character and not jumping then
+    if config.infJumpEnabled and player.Character then
         local root = player.Character:FindFirstChild("HumanoidRootPart")
         if root then
-            jumping = true
-            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
-            
-            local velocity = Instance.new("BodyVelocity")
-            velocity.Velocity = Vector3.new(0, 56, 0)
-            velocity.MaxForce = Vector3.new(0, 8000, 0)
-            velocity.P = 1250
-            velocity.Parent = root
-            
-            task.wait(0.1)
-            velocity:Destroy()
-            jumping = false
+            -- Reset Y velocity to 0 to stop any "downward pull" from the anti-cheat
+            root.Velocity = Vector3.new(root.Velocity.X, 0, root.Velocity.Z)
+            -- Small CFrame nudge + Pure Velocity Jump
+            root.CFrame = root.CFrame * CFrame.new(0, 0.1, 0)
+            root.Velocity = root.Velocity + Vector3.new(0, 52, 0)
         end
     end
 end)
