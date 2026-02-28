@@ -6,7 +6,7 @@ local CoreGui = game:GetService("CoreGui")
 
 local FILE_NAME = "NoNameHub.json"
 local boostEnabled = false
-local boostSpeed = 31 -- The absolute limit for most server-side checks
+local boostSpeed = 32.5 
 
 local function loadPosition()
     if readfile and isfile and isfile(FILE_NAME) then
@@ -118,8 +118,8 @@ credit.TextSize = 8
 credit.TextColor3 = Color3.fromRGB(110,110,110)
 credit.TextXAlignment = Enum.TextXAlignment.Right
 
--- ANTI-LAGBACK STEALTH METHOD
-RunService.PreRender:Connect(function(delta)
+-- ARMORED VELOCITY METHOD
+RunService.Heartbeat:Connect(function()
     local color = Color3.fromHSV(tick() % 5 / 5, 1, 1)
     frameStroke.Color = color
     minStroke.Color = color
@@ -136,13 +136,19 @@ RunService.PreRender:Connect(function(delta)
         
         if root and hum then
             if hum.MoveDirection.Magnitude > 0 then
-                -- Disable standard physics velocity to hide from server "Speed" checks
-                root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
+                -- Apply speed via Smooth Velocity injection
+                local targetVel = Vector3.new(hum.MoveDirection.X * boostSpeed, root.Velocity.Y, hum.MoveDirection.Z * boostSpeed)
+                root.Velocity = root.Velocity:Lerp(targetVel, 0.6)
                 
-                -- Shift position directly (CFrame)
-                -- 31 speed / 60 fps = ~0.5 studs per frame (Stealthy)
-                local moveVec = hum.MoveDirection * (boostSpeed * delta)
-                root.CFrame = root.CFrame + moveVec
+                -- Anti-Friction: Makes you "glide" so the game can't slow you down
+                for _, part in pairs(char:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        part.CustomPhysicalProperties = PhysicalProperties.new(0, 0, 0, 0, 0)
+                    end
+                end
+            else
+                -- Full Stop to prevent sliding into lag-back zones
+                root.Velocity = Vector3.new(0, root.Velocity.Y, 0)
             end
         end
     end
@@ -152,6 +158,13 @@ end)
 boostBtn.MouseButton1Click:Connect(function()
     boostEnabled = not boostEnabled
     boostBtn.Text = "SPEED BOOST: " .. (boostEnabled and "ON" or "OFF")
+    
+    -- Cleanup physical properties when turned off
+    if not boostEnabled and player.Character then
+        for _, part in pairs(player.Character:GetChildren()) do
+            if part:IsA("BasePart") then part.CustomPhysicalProperties = nil end
+        end
+    end
 end)
 
 minBtn.MouseButton1Click:Connect(function()
