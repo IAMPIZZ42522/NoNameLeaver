@@ -48,7 +48,7 @@ local function createToggle(prop, text)
     return btn, str
 end
 
--- UTILITY BUTTONS
+-- BUTTONS
 local resB, resS = createUtil("RESPAWN")
 local rejB, rejS = createUtil("REJOIN")
 local leaB, leaS = createUtil("LEAVE")
@@ -67,21 +67,27 @@ local sBtn, sStr = createToggle("infJumpEnabled", "INF JUMP")
 local eBtn, eStr = createToggle("espEnabled", "PLAYER ESP")
 local rBtn, rStr = createToggle("antiRagdoll", "ANTI RAGDOLL")
 
--- MOVEMENT ENGINE
+-- ENGINE
 RunService.Stepped:Connect(function()
     local char = player.Character; local root = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
     if root and hum then
-        -- Version for Speed: Handle sharp turns
+        -- Speed version for sharp turns
         if config.boostEnabled and hum.MoveDirection.Magnitude > 0 then
             root.AssemblyLinearVelocity = (hum.MoveDirection * config.speed) + Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
         end
-        
-        -- Version for Inf Jump: State-Change method
-        if config.infJumpEnabled and UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-            hum:ChangeState(Enum.HumanoidStateType.Jumping)
-        end
-
         if config.antiRagdoll then hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false); hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end
+    end
+end)
+
+-- INF JUMP (Version with Pullback wiping)
+UserInputService.JumpRequest:Connect(function()
+    if config.infJumpEnabled and player.Character then
+        local root = player.Character:FindFirstChild("HumanoidRootPart")
+        if root then 
+            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
+            task.wait()
+            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 58, root.AssemblyLinearVelocity.Z) 
+        end
     end
 end)
 
@@ -89,7 +95,7 @@ end)
 local isSliding = false
 local function updateSlider(input)
     local p = math.clamp((input.Position.X - sliderFrame.AbsolutePosition.X) / sliderFrame.AbsoluteSize.X, 0, 1)
-    config.speed = math.floor(16 + (p * 34))
+    config.speed = math.floor(16 + (p * 34)) -- Capped at 50
     sliderFill.Size = UDim2.new(p, 0, 1, 0); knob.Position = UDim2.new(p, -9, 0.5, -9)
 end
 sliderFrame.InputBegan:Connect(function(i) if (i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch) then isSliding = true; updateSlider(i) end end)
@@ -108,23 +114,10 @@ minBox.MouseButton1Click:Connect(function() config.minimized = false; frame.Visi
 
 resB.MouseButton1Click:Connect(function() if player.Character and player.Character:FindFirstChild("Humanoid") then player.Character.Humanoid.Health = 0 end end)
 rejB.MouseButton1Click:Connect(function() TeleportService:Teleport(game.PlaceId, player) end)
-leaB.MouseButton1Click:Connect(function() player:Kick("Left Game") end)
+leaB.MouseButton1Click:Connect(function() player:Kick("kicked by mrfunnynutz") end)
 
--- ESP
-local function applyESP(plr)
-    if plr == player then return end
-    RunService.RenderStepped:Connect(function()
-        if plr.Character then
-            local high = plr.Character:FindFirstChild("NN_ESP") or Instance.new("Highlight", plr.Character)
-            high.Name = "NN_ESP"; high.Enabled = config.espEnabled
-            high.FillColor = Color3.fromHSV(tick() % 5 / 5, 0.7, 1); high.FillTransparency = 0.5
-        end
-    end)
-end
-for _, p in pairs(game.Players:GetPlayers()) do applyESP(p) end
-game.Players.PlayerAdded:Connect(applyESP)
-
+-- RAINBOW SYNC
 RunService.RenderStepped:Connect(function()
     local color = Color3.fromHSV(tick() % 5 / 5, 0.8, 1)
-    frameStroke.Color = color; minStroke.Color = color; resS.Color = color; rejS.Color = color; leaS.Color = color; bStr.Color = color; sStr.Color = color; eStr.Color = color; rStr.Color = color; knob.BackgroundColor3 = color; sliderFill.BackgroundColor3 = color
+    frameStroke.Color = color; minStroke.Color = color; resS.Color = color; rejS.Color = color; leaS.Color = color; bStr.Color = color; sStr.Color = color; knob.BackgroundColor3 = color; sliderFill.BackgroundColor3 = color
 end)
