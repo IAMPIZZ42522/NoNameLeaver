@@ -76,7 +76,6 @@ local function createToggle(prop, text)
     btn.MouseButton1Click:Connect(function()
         config[prop] = not config[prop]
         btn.Text = text .. ": " .. (config[prop] and "ON" or "OFF")
-        -- Fix: Instantly clear velocity if turning off speed
         if prop == "boostEnabled" and not config[prop] then
             local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
             if root then root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0) end
@@ -104,7 +103,7 @@ local eBtn, eStr = createToggle("espEnabled", "PLAYER ESP")
 local rBtn, rStr = createToggle("antiRagdoll", "ANTI RAGDOLL")
 local kBtn, kStr = createToggle("antiKB", "ANTI KNOCKBACK")
 
--- MAIN LOOP (REVERTED TO "PERFECT" SPEED METHOD)
+-- CORE LOOP
 RunService.Stepped:Connect(function()
     local color = Color3.fromHSV(tick() % 5 / 5, 0.8, 1)
     frameStroke.Color = color; minStroke.Color = color; knob.BackgroundColor3 = color; sliderFill.BackgroundColor3 = color
@@ -112,18 +111,17 @@ RunService.Stepped:Connect(function()
 
     local char = player.Character; local root = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum and root then
-        -- SPEED (Reverted to your working Lerp version)
+        -- SPEED (FIXED SHARP TURNS)
         if config.boostEnabled and hum.MoveDirection.Magnitude > 0 then
-            root.AssemblyLinearVelocity = Vector3.new(hum.MoveDirection.X * config.speed, root.AssemblyLinearVelocity.Y, hum.MoveDirection.Z * config.speed)
+            -- Zero out horizontal velocity before applying new direction to prevent lag-back
+            local velY = root.AssemblyLinearVelocity.Y
+            root.AssemblyLinearVelocity = (hum.MoveDirection * config.speed) + Vector3.new(0, velY, 0)
         end
         
-        -- ANTI SLOW FIX
-        if not config.boostEnabled and hum.WalkSpeed < 16 then
-            hum.WalkSpeed = 16
-        end
-
         if config.antiRagdoll then hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false); hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end
-        if config.antiKB and not config.boostEnabled then root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0) end
+        if config.antiKB and not config.boostEnabled and not config.infJumpEnabled then 
+            root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0) 
+        end
     end
 end)
 
@@ -153,18 +151,18 @@ end
 for _, p in pairs(game.Players:GetPlayers()) do applyESP(p) end
 game.Players.PlayerAdded:Connect(applyESP)
 
--- PURE VELOCITY INF JUMP (REVERTED TO BEST VERSION)
+-- BETTER INF JUMP
 UserInputService.JumpRequest:Connect(function()
     if config.infJumpEnabled and player.Character then
         local root = player.Character:FindFirstChild("HumanoidRootPart")
         if root then
-            -- Set upward velocity immediately without stacking forces
-            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 55, root.AssemblyLinearVelocity.Z)
+            -- Reset Y so we don't fight falling gravity
+            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 58, root.AssemblyLinearVelocity.Z)
         end
     end
 end)
 
 resB.MouseButton1Click:Connect(function() if player.Character and player.Character:FindFirstChild("Humanoid") then player.Character.Humanoid.Health = 0 end end)
 rejB.MouseButton1Click:Connect(function() TeleportService:Teleport(game.PlaceId, player) end)
-leaB.MouseButton1Click:Connect(function() player:Kick("Hub Closed") end)
+leaB.MouseButton1Click:Connect(function() player:Kick("kicked by mrfunnynutz") end) -- NEW KICK MSG
 frame:GetPropertyChangedSignal("Position"):Connect(function() config.pos = {frame.Position.X.Scale, frame.Position.X.Offset, frame.Position.Y.Scale, frame.Position.Y.Offset}; saveSettings() end)
