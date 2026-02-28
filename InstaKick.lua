@@ -32,17 +32,17 @@ local screenGui = Instance.new("ScreenGui", CoreGui)
 screenGui.Name = "NoNameHub"; screenGui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame", screenGui)
-frame.Size = UDim2.new(0, 190, 0, 290) -- Slightly taller for the lock button
+frame.Size = UDim2.new(0, 190, 0, 275) 
 frame.Position = UDim2.new(config.pos[1], config.pos[2], config.pos[3], config.pos[4])
 frame.BackgroundColor3 = Color3.fromRGB(12,12,12); frame.BorderSizePixel = 0; frame.Active = true; frame.Draggable = true; frame.Visible = not config.minimized
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
 local frameStroke = Instance.new("UIStroke", frame); frameStroke.Thickness = 1.5
 
--- SCROLLING CONTAINER
+-- SCROLLING CONTAINER (Increased Canvas for the Lock Button)
 local scroll = Instance.new("ScrollingFrame", frame)
 scroll.Size = UDim2.new(1, 0, 1, -50); scroll.Position = UDim2.new(0, 0, 0, 30)
 scroll.BackgroundTransparency = 1; scroll.BorderSizePixel = 0; scroll.ScrollBarThickness = 2
-scroll.CanvasSize = UDim2.new(0, 0, 0, 520) 
+scroll.CanvasSize = UDim2.new(0, 0, 0, 560) 
 
 local layout = Instance.new("UIListLayout", scroll)
 layout.HorizontalAlignment = Enum.HorizontalAlignment.Center; layout.Padding = UDim.new(0, 8); layout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -83,11 +83,11 @@ local resB, resS = createUtil("RESPAWN")
 local rejB, rejS = createUtil("REJOIN")
 local leaB, leaS = createUtil("LEAVE")
 
--- 2. SPEED & LOCK
+-- 2. SPEED & THE LOCK BUTTON
 local bBtn, bStr = createToggle("boostEnabled", "SPEED BOOST")
 
 local lockBtn, lockStr = createUtil(config.sliderLocked and "UNLOCK SLIDER" or "LOCK SLIDER")
-lockBtn.Size = UDim2.new(0.85, 0, 0, 25) -- Smaller button
+lockBtn.Size = UDim2.new(0.85, 0, 0, 28)
 
 local sliderFrame = Instance.new("Frame", scroll); sliderFrame.Size = UDim2.new(0.85, 0, 0, 10); sliderFrame.BackgroundColor3 = Color3.fromRGB(45,45,45); sliderFrame.BorderSizePixel = 0; Instance.new("UICorner", sliderFrame)
 local sliderFill = Instance.new("Frame", sliderFrame); sliderFill.Size = UDim2.new(((config.speed-16)/34), 0, 1, 0); sliderFill.BackgroundColor3 = Color3.new(1,1,1); Instance.new("UICorner", sliderFill)
@@ -97,18 +97,18 @@ local speedValueLabel = Instance.new("TextLabel", scroll); speedValueLabel.Size 
 lockBtn.MouseButton1Click:Connect(function()
     config.sliderLocked = not config.sliderLocked
     lockBtn.Text = config.sliderLocked and "UNLOCK SLIDER" or "LOCK SLIDER"
-    sliderFrame.BackgroundTransparency = config.sliderLocked and 0.5 or 0
     saveSettings()
 end)
 
--- 3. ELITE TOGGLES
+-- 3. REMAINING ELITE
 local sBtn, sStr = createToggle("infJumpEnabled", "INF JUMP")
 local eBtn, eStr = createToggle("espEnabled", "PLAYER ESP")
 local rBtn, rStr = createToggle("antiRagdoll", "ANTI RAGDOLL")
 local kBtn, kStr = createToggle("antiKB", "ANTI KNOCKBACK")
 
--- CORE LOOP
+-- CORE ENGINE
 RunService.Stepped:Connect(function()
+    -- Visual Indicator: Red when locked, RGB when unlocked
     local color = config.sliderLocked and Color3.fromRGB(255, 50, 50) or Color3.fromHSV(tick() % 5 / 5, 0.8, 1)
     frameStroke.Color = color; minStroke.Color = color; knob.BackgroundColor3 = color; sliderFill.BackgroundColor3 = color
     resS.Color = color; rejS.Color = color; leaS.Color = color; bStr.Color = color; lockStr.Color = color; sStr.Color = color; eStr.Color = color; rStr.Color = color; kStr.Color = color
@@ -116,7 +116,6 @@ RunService.Stepped:Connect(function()
     local char = player.Character; local root = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum and root then
         if config.boostEnabled and hum.MoveDirection.Magnitude > 0 then
-            -- Frictionless Turn: Apply velocity directly to move direction
             root.AssemblyLinearVelocity = (hum.MoveDirection * config.speed) + Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
         end
         if config.antiRagdoll then hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false); hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end
@@ -139,7 +138,7 @@ sliderFrame.InputBegan:Connect(function(i) if (i.UserInputType == Enum.UserInput
 UserInputService.InputChanged:Connect(function(i) if isSliding and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then updateSlider(i) end end)
 UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then isSliding = false; saveSettings() end end)
 
--- ESP & REJOIN/LEAVE
+-- ESP
 local function applyESP(plr)
     if plr == player then return end
     RunService.RenderStepped:Connect(function()
@@ -153,10 +152,16 @@ end
 for _, p in pairs(game.Players:GetPlayers()) do applyESP(p) end
 game.Players.PlayerAdded:Connect(applyESP)
 
+-- INF JUMP (FIXED PULLBACK STACKING)
 UserInputService.JumpRequest:Connect(function()
     if config.infJumpEnabled and player.Character then
         local root = player.Character:FindFirstChild("HumanoidRootPart")
-        if root then root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 58, root.AssemblyLinearVelocity.Z) end
+        if root then 
+            -- WIPE vertical velocity to 0 to delete the "Pull Back" force before applying jump
+            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
+            task.wait()
+            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 58, root.AssemblyLinearVelocity.Z) 
+        end
     end
 end)
 
