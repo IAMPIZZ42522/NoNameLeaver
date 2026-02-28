@@ -28,12 +28,17 @@ loadSettings()
 local function saveSettings() if writefile then writefile(FILE_NAME, HttpService:JSONEncode(config)) end end
 
 local screenGui = Instance.new("ScreenGui", CoreGui)
-screenGui.Name = "NoNameHub"; screenGui.ResetOnSpawn = false
+screenGui.Name = "NoNameHub"
+screenGui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame", screenGui)
 frame.Size = UDim2.new(0, 190, 0, 275) 
 frame.Position = UDim2.new(config.pos[1], config.pos[2], config.pos[3], config.pos[4])
-frame.BackgroundColor3 = Color3.fromRGB(15,15,15); frame.BorderSizePixel = 0; frame.Active = true; frame.Draggable = true; frame.Visible = not config.minimized
+frame.BackgroundColor3 = Color3.fromRGB(12,12,12)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Visible = not config.minimized
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
 local frameStroke = Instance.new("UIStroke", frame); frameStroke.Thickness = 1.5
 
@@ -48,7 +53,7 @@ layout.HorizontalAlignment = Enum.HorizontalAlignment.Center; layout.Padding = U
 
 -- BIG NN BUTTON
 local minBox = Instance.new("TextButton", screenGui)
-minBox.Visible = config.minimized; minBox.Size = UDim2.new(0, 60, 0, 60); minBox.Position = frame.Position; minBox.BackgroundColor3 = Color3.fromRGB(15,15,15); minBox.Text = "NN"; minBox.Font = Enum.Font.GothamBold; minBox.TextColor3 = Color3.new(1,1,1); minBox.TextSize = 22; minBox.Draggable = true; Instance.new("UICorner", minBox).CornerRadius = UDim.new(0, 15)
+minBox.Visible = config.minimized; minBox.Size = UDim2.new(0, 60, 0, 60); minBox.Position = frame.Position; minBox.BackgroundColor3 = Color3.fromRGB(12,12,12); minBox.Text = "NN"; minBox.Font = Enum.Font.GothamBold; minBox.TextColor3 = Color3.new(1,1,1); minBox.TextSize = 22; minBox.Draggable = true; Instance.new("UICorner", minBox).CornerRadius = UDim.new(0, 15)
 local minStroke = Instance.new("UIStroke", minBox); minStroke.Thickness = 1.5
 local cTime = 0
 minBox.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then cTime = tick() end end)
@@ -74,7 +79,14 @@ end
 local function createToggle(prop, text)
     local btn, str = createUtil(text .. ": " .. (config[prop] and "ON" or "OFF"))
     btn.MouseButton1Click:Connect(function()
-        config[prop] = not config[prop]; btn.Text = text .. ": " .. (config[prop] and "ON" or "OFF"); saveSettings()
+        config[prop] = not config[prop]
+        btn.Text = text .. ": " .. (config[prop] and "ON" or "OFF")
+        -- FIX: Reset velocity instantly when turning OFF speed
+        if prop == "boostEnabled" and not config[prop] then
+            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if root then root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0) end
+        end
+        saveSettings()
     end)
     return btn, str
 end
@@ -91,13 +103,13 @@ local sliderFill = Instance.new("Frame", sliderFrame); sliderFill.Size = UDim2.n
 local knob = Instance.new("Frame", sliderFrame); knob.Size = UDim2.new(0, 18, 0, 18); knob.BackgroundColor3 = Color3.new(1,1,1); Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
 local speedValueLabel = Instance.new("TextLabel", scroll); speedValueLabel.Size = UDim2.new(0.85, 0, 0, 15); speedValueLabel.BackgroundTransparency = 1; speedValueLabel.Text = "Speed: "..config.speed.." (Safe: <32)"; speedValueLabel.Font = Enum.Font.GothamMedium; speedValueLabel.TextSize = 9; speedValueLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
 
--- 3. REMAINING ELITE
+-- 3. ELITE TOGGLES
 local sBtn, sStr = createToggle("infJumpEnabled", "INF JUMP")
 local eBtn, eStr = createToggle("espEnabled", "PLAYER ESP")
 local rBtn, rStr = createToggle("antiRagdoll", "ANTI RAGDOLL")
 local kBtn, kStr = createToggle("antiKB", "ANTI KNOCKBACK")
 
--- ENGINE
+-- ENGINE (FIXED SLOWDOWN ERROR)
 RunService.Stepped:Connect(function()
     local color = Color3.fromHSV(tick() % 5 / 5, 0.8, 1)
     frameStroke.Color = color; minStroke.Color = color; knob.BackgroundColor3 = color; sliderFill.BackgroundColor3 = color
@@ -107,13 +119,17 @@ RunService.Stepped:Connect(function()
     if hum and root then
         if config.boostEnabled and hum.MoveDirection.Magnitude > 0 then
             root.AssemblyLinearVelocity = root.AssemblyLinearVelocity:Lerp(Vector3.new(hum.MoveDirection.X * config.speed, root.AssemblyLinearVelocity.Y, hum.MoveDirection.Z * config.speed), 0.75)
+        elseif not config.boostEnabled and hum.MoveDirection.Magnitude > 0 then
+            -- Error Fix: Ensure character doesn't stay slow when turning off boost
+            if hum.WalkSpeed < 16 then hum.WalkSpeed = 16 end
         end
+        
         if config.antiRagdoll then hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false); hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end
         if config.antiKB and not config.boostEnabled then root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0) end
     end
 end)
 
--- SLIDER
+-- SLIDER LOGIC
 local isSliding = false
 local function updateSlider(input)
     local p = math.clamp((input.Position.X - sliderFrame.AbsolutePosition.X) / sliderFrame.AbsoluteSize.X, 0, 1)
@@ -139,13 +155,24 @@ end
 for _, p in pairs(game.Players:GetPlayers()) do applyESP(p) end
 game.Players.PlayerAdded:Connect(applyESP)
 
--- INF JUMP (NO-KILL VERSION)
+-- FIXED INF JUMP (NO STACKING ERROR)
+local jumping = false
 UserInputService.JumpRequest:Connect(function()
-    if config.infJumpEnabled and player.Character then
+    if config.infJumpEnabled and player.Character and not jumping then
         local root = player.Character:FindFirstChild("HumanoidRootPart")
         if root then
-            -- Pure velocity boost without forcing state changes to avoid anti-cheat death
-            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 55, root.AssemblyLinearVelocity.Z) 
+            jumping = true
+            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z)
+            
+            local velocity = Instance.new("BodyVelocity")
+            velocity.Velocity = Vector3.new(0, 56, 0)
+            velocity.MaxForce = Vector3.new(0, 8000, 0)
+            velocity.P = 1250
+            velocity.Parent = root
+            
+            task.wait(0.1)
+            velocity:Destroy()
+            jumping = false
         end
     end
 end)
