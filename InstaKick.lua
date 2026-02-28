@@ -6,7 +6,7 @@ local CoreGui = game:GetService("CoreGui")
 
 local FILE_NAME = "NoNameHub.json"
 local boostEnabled = false
-local boostSpeed = 33 -- Set to 33 for maximum power without rubber-banding
+local boostSpeed = 32 -- Optimized for maximum force with zero lag-back
 
 local function loadPosition()
     if readfile and isfile and isfile(FILE_NAME) then
@@ -118,8 +118,8 @@ credit.TextSize = 8
 credit.TextColor3 = Color3.fromRGB(110,110,110)
 credit.TextXAlignment = Enum.TextXAlignment.Right
 
--- FINAL BOSS SPEED METHOD (CFrame Stepping + Velocity Overwrite)
-RunService.Stepped:Connect(function(delta)
+-- GOD-MODE SPEED METHOD
+RunService.PreSimulation:Connect(function(delta)
     local color = Color3.fromHSV(tick() % 5 / 5, 1, 1)
     frameStroke.Color = color
     minStroke.Color = color
@@ -134,13 +134,19 @@ RunService.Stepped:Connect(function(delta)
         local root = char and char:FindFirstChild("HumanoidRootPart")
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         
-        if root and hum and hum.MoveDirection.Magnitude > 0 then
-            -- Force Assembly Velocity to clear game friction/drag
-            root.AssemblyLinearVelocity = Vector3.new(hum.MoveDirection.X * boostSpeed, root.AssemblyLinearVelocity.Y, hum.MoveDirection.Z * boostSpeed)
-            
-            -- CFrame Step: Physically moves your hitbox forward 
-            -- This bypasses slowdowns tied to tool weight or animations
-            root.CFrame = root.CFrame + (hum.MoveDirection * (boostSpeed * delta * 0.5))
+        if root and hum then
+            if hum.MoveDirection.Magnitude > 0 then
+                -- Force state to Running to prevent "Slowdown" animations
+                hum:ChangeState(Enum.HumanoidStateType.Running)
+                
+                -- The "God" Shove: Move CFrame slightly and match Velocity perfectly
+                local vel = hum.MoveDirection * boostSpeed
+                root.AssemblyLinearVelocity = Vector3.new(vel.X, root.AssemblyLinearVelocity.Y, vel.Z)
+                root.CFrame = root.CFrame + (hum.MoveDirection * (boostSpeed * delta * 0.45))
+            else
+                -- Stop immediately when keys are released to avoid sliding into lag-back
+                root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
+            end
         end
     end
 end)
