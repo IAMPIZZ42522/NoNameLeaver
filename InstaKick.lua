@@ -6,7 +6,7 @@ local CoreGui = game:GetService("CoreGui")
 
 local FILE_NAME = "NoNameHub.json"
 local boostEnabled = false
-local boostSpeed = 35 -- Increased for extra speed while staying safe from lag-back
+local boostSpeed = 33 -- Set to 33 for maximum power without rubber-banding
 
 local function loadPosition()
     if readfile and isfile and isfile(FILE_NAME) then
@@ -118,8 +118,8 @@ credit.TextSize = 8
 credit.TextColor3 = Color3.fromRGB(110,110,110)
 credit.TextXAlignment = Enum.TextXAlignment.Right
 
--- RAINBOW & HIGH-POWER VELOCITY BOOST
-RunService.Heartbeat:Connect(function()
+-- FINAL BOSS SPEED METHOD (CFrame Stepping + Velocity Overwrite)
+RunService.Stepped:Connect(function(delta)
     local color = Color3.fromHSV(tick() % 5 / 5, 1, 1)
     frameStroke.Color = color
     minStroke.Color = color
@@ -134,12 +134,13 @@ RunService.Heartbeat:Connect(function()
         local root = char and char:FindFirstChild("HumanoidRootPart")
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         
-        if root and hum then
-            if hum.MoveDirection.Magnitude > 0 then
-                -- Smoothed velocity injection at speed 35
-                local targetVel = Vector3.new(hum.MoveDirection.X * boostSpeed, root.Velocity.Y, hum.MoveDirection.Z * boostSpeed)
-                root.Velocity = root.Velocity:Lerp(targetVel, 0.5)
-            end
+        if root and hum and hum.MoveDirection.Magnitude > 0 then
+            -- Force Assembly Velocity to clear game friction/drag
+            root.AssemblyLinearVelocity = Vector3.new(hum.MoveDirection.X * boostSpeed, root.AssemblyLinearVelocity.Y, hum.MoveDirection.Z * boostSpeed)
+            
+            -- CFrame Step: Physically moves your hitbox forward 
+            -- This bypasses slowdowns tied to tool weight or animations
+            root.CFrame = root.CFrame + (hum.MoveDirection * (boostSpeed * delta * 0.5))
         end
     end
 end)
