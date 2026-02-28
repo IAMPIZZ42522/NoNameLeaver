@@ -14,7 +14,8 @@ local config = {
     antiRagdoll = false,
     antiKB = false,
     speed = 32,
-    minimized = false
+    minimized = false,
+    sliderLocked = false
 }
 
 -- LOAD/SAVE
@@ -31,7 +32,7 @@ local screenGui = Instance.new("ScreenGui", CoreGui)
 screenGui.Name = "NoNameHub"; screenGui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame", screenGui)
-frame.Size = UDim2.new(0, 190, 0, 275) 
+frame.Size = UDim2.new(0, 190, 0, 290) -- Slightly taller for the lock button
 frame.Position = UDim2.new(config.pos[1], config.pos[2], config.pos[3], config.pos[4])
 frame.BackgroundColor3 = Color3.fromRGB(12,12,12); frame.BorderSizePixel = 0; frame.Active = true; frame.Draggable = true; frame.Visible = not config.minimized
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
@@ -41,7 +42,7 @@ local frameStroke = Instance.new("UIStroke", frame); frameStroke.Thickness = 1.5
 local scroll = Instance.new("ScrollingFrame", frame)
 scroll.Size = UDim2.new(1, 0, 1, -50); scroll.Position = UDim2.new(0, 0, 0, 30)
 scroll.BackgroundTransparency = 1; scroll.BorderSizePixel = 0; scroll.ScrollBarThickness = 2
-scroll.CanvasSize = UDim2.new(0, 0, 0, 480) 
+scroll.CanvasSize = UDim2.new(0, 0, 0, 520) 
 
 local layout = Instance.new("UIListLayout", scroll)
 layout.HorizontalAlignment = Enum.HorizontalAlignment.Center; layout.Padding = UDim.new(0, 8); layout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -61,10 +62,6 @@ title.Size = UDim2.new(1, -40, 0, 22); title.Position = UDim2.new(0, 10, 0, 5); 
 local credits = Instance.new("TextLabel", frame)
 credits.Size = UDim2.new(1, 0, 0, 15); credits.Position = UDim2.new(0, 0, 1, -18); credits.BackgroundTransparency = 1; credits.Text = "MrFuNnYnUtZ on TT"; credits.Font = Enum.Font.GothamMedium; credits.TextSize = 9; credits.TextColor3 = Color3.fromRGB(180,180,180)
 
-local minBtn = Instance.new("TextButton", frame)
-minBtn.Size = UDim2.new(0, 25, 0, 25); minBtn.Position = UDim2.new(1, -30, 0, 5); minBtn.BackgroundTransparency = 1; minBtn.Text = "-"; minBtn.Font = Enum.Font.GothamMedium; minBtn.TextSize = 20; minBtn.TextColor3 = Color3.new(1,1,1)
-minBtn.MouseButton1Click:Connect(function() config.minimized = true; frame.Visible = false; minBox.Visible = true; minBox.Position = frame.Position; saveSettings() end)
-
 -- UI HELPERS
 local function createUtil(name)
     local b = Instance.new("TextButton", scroll); b.Size = UDim2.new(0.85, 0, 0, 32); b.BackgroundColor3 = Color3.fromRGB(28,28,28); b.Text = name; b.Font = Enum.Font.GothamBold; b.TextSize = 10; b.TextColor3 = Color3.new(1,1,1)
@@ -76,10 +73,6 @@ local function createToggle(prop, text)
     btn.MouseButton1Click:Connect(function()
         config[prop] = not config[prop]
         btn.Text = text .. ": " .. (config[prop] and "ON" or "OFF")
-        if prop == "boostEnabled" and not config[prop] then
-            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-            if root then root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0) end
-        end
         saveSettings()
     end)
     return btn, str
@@ -90,14 +83,25 @@ local resB, resS = createUtil("RESPAWN")
 local rejB, rejS = createUtil("REJOIN")
 local leaB, leaS = createUtil("LEAVE")
 
--- 2. SPEED
+-- 2. SPEED & LOCK
 local bBtn, bStr = createToggle("boostEnabled", "SPEED BOOST")
+
+local lockBtn, lockStr = createUtil(config.sliderLocked and "UNLOCK SLIDER" or "LOCK SLIDER")
+lockBtn.Size = UDim2.new(0.85, 0, 0, 25) -- Smaller button
+
 local sliderFrame = Instance.new("Frame", scroll); sliderFrame.Size = UDim2.new(0.85, 0, 0, 10); sliderFrame.BackgroundColor3 = Color3.fromRGB(45,45,45); sliderFrame.BorderSizePixel = 0; Instance.new("UICorner", sliderFrame)
-local sliderFill = Instance.new("Frame", sliderFrame); sliderFill.Size = UDim2.new(0.5, 0, 1, 0); sliderFill.BackgroundColor3 = Color3.new(1,1,1); Instance.new("UICorner", sliderFill)
-local knob = Instance.new("Frame", sliderFrame); knob.Size = UDim2.new(0, 18, 0, 18); knob.BackgroundColor3 = Color3.new(1,1,1); Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
+local sliderFill = Instance.new("Frame", sliderFrame); sliderFill.Size = UDim2.new(((config.speed-16)/34), 0, 1, 0); sliderFill.BackgroundColor3 = Color3.new(1,1,1); Instance.new("UICorner", sliderFill)
+local knob = Instance.new("Frame", sliderFrame); knob.Size = UDim2.new(0, 18, 0, 18); knob.Position = UDim2.new(((config.speed-16)/34), -9, 0.5, -9); knob.BackgroundColor3 = Color3.new(1,1,1); Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
 local speedValueLabel = Instance.new("TextLabel", scroll); speedValueLabel.Size = UDim2.new(0.85, 0, 0, 15); speedValueLabel.BackgroundTransparency = 1; speedValueLabel.Text = "Speed: "..config.speed.." (Safe: <32)"; speedValueLabel.Font = Enum.Font.GothamMedium; speedValueLabel.TextSize = 9; speedValueLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
 
--- 3. ELITE
+lockBtn.MouseButton1Click:Connect(function()
+    config.sliderLocked = not config.sliderLocked
+    lockBtn.Text = config.sliderLocked and "UNLOCK SLIDER" or "LOCK SLIDER"
+    sliderFrame.BackgroundTransparency = config.sliderLocked and 0.5 or 0
+    saveSettings()
+end)
+
+-- 3. ELITE TOGGLES
 local sBtn, sStr = createToggle("infJumpEnabled", "INF JUMP")
 local eBtn, eStr = createToggle("espEnabled", "PLAYER ESP")
 local rBtn, rStr = createToggle("antiRagdoll", "ANTI RAGDOLL")
@@ -105,19 +109,16 @@ local kBtn, kStr = createToggle("antiKB", "ANTI KNOCKBACK")
 
 -- CORE LOOP
 RunService.Stepped:Connect(function()
-    local color = Color3.fromHSV(tick() % 5 / 5, 0.8, 1)
+    local color = config.sliderLocked and Color3.fromRGB(255, 50, 50) or Color3.fromHSV(tick() % 5 / 5, 0.8, 1)
     frameStroke.Color = color; minStroke.Color = color; knob.BackgroundColor3 = color; sliderFill.BackgroundColor3 = color
-    resS.Color = color; rejS.Color = color; leaS.Color = color; bStr.Color = color; sStr.Color = color; eStr.Color = color; rStr.Color = color; kStr.Color = color
+    resS.Color = color; rejS.Color = color; leaS.Color = color; bStr.Color = color; lockStr.Color = color; sStr.Color = color; eStr.Color = color; rStr.Color = color; kStr.Color = color
 
     local char = player.Character; local root = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum and root then
-        -- SPEED (FIXED SHARP TURNS)
         if config.boostEnabled and hum.MoveDirection.Magnitude > 0 then
-            -- Zero out horizontal velocity before applying new direction to prevent lag-back
-            local velY = root.AssemblyLinearVelocity.Y
-            root.AssemblyLinearVelocity = (hum.MoveDirection * config.speed) + Vector3.new(0, velY, 0)
+            -- Frictionless Turn: Apply velocity directly to move direction
+            root.AssemblyLinearVelocity = (hum.MoveDirection * config.speed) + Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
         end
-        
         if config.antiRagdoll then hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false); hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end
         if config.antiKB and not config.boostEnabled and not config.infJumpEnabled then 
             root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0) 
@@ -125,19 +126,20 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- SLIDER
+-- SLIDER LOGIC
 local isSliding = false
 local function updateSlider(input)
+    if config.sliderLocked then return end
     local p = math.clamp((input.Position.X - sliderFrame.AbsolutePosition.X) / sliderFrame.AbsoluteSize.X, 0, 1)
     config.speed = math.floor(16 + (p * 34))
     speedValueLabel.Text = "Speed: " .. tostring(config.speed) .. " (Safe: <32)"
     sliderFill.Size = UDim2.new(p, 0, 1, 0); knob.Position = UDim2.new(p, -9, 0.5, -9)
 end
-sliderFrame.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then isSliding = true; updateSlider(i) end end)
+sliderFrame.InputBegan:Connect(function(i) if (i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch) and not config.sliderLocked then isSliding = true; updateSlider(i) end end)
 UserInputService.InputChanged:Connect(function(i) if isSliding and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then updateSlider(i) end end)
 UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then isSliding = false; saveSettings() end end)
 
--- ESP
+-- ESP & REJOIN/LEAVE
 local function applyESP(plr)
     if plr == player then return end
     RunService.RenderStepped:Connect(function()
@@ -151,18 +153,18 @@ end
 for _, p in pairs(game.Players:GetPlayers()) do applyESP(p) end
 game.Players.PlayerAdded:Connect(applyESP)
 
--- BETTER INF JUMP
 UserInputService.JumpRequest:Connect(function()
     if config.infJumpEnabled and player.Character then
         local root = player.Character:FindFirstChild("HumanoidRootPart")
-        if root then
-            -- Reset Y so we don't fight falling gravity
-            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 58, root.AssemblyLinearVelocity.Z)
-        end
+        if root then root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 58, root.AssemblyLinearVelocity.Z) end
     end
 end)
 
 resB.MouseButton1Click:Connect(function() if player.Character and player.Character:FindFirstChild("Humanoid") then player.Character.Humanoid.Health = 0 end end)
 rejB.MouseButton1Click:Connect(function() TeleportService:Teleport(game.PlaceId, player) end)
-leaB.MouseButton1Click:Connect(function() player:Kick("kicked by mrfunnynutz") end) -- NEW KICK MSG
+leaB.MouseButton1Click:Connect(function() player:Kick("kicked by mrfunnynutz") end)
+
+local minBtn = Instance.new("TextButton", frame)
+minBtn.Size = UDim2.new(0, 25, 0, 25); minBtn.Position = UDim2.new(1, -30, 0, 5); minBtn.BackgroundTransparency = 1; minBtn.Text = "-"; minBtn.Font = Enum.Font.GothamMedium; minBtn.TextSize = 20; minBtn.TextColor3 = Color3.new(1,1,1)
+minBtn.MouseButton1Click:Connect(function() config.minimized = true; frame.Visible = false; minBox.Visible = true; minBox.Position = frame.Position; saveSettings() end)
 frame:GetPropertyChangedSignal("Position"):Connect(function() config.pos = {frame.Position.X.Scale, frame.Position.X.Offset, frame.Position.Y.Scale, frame.Position.Y.Offset}; saveSettings() end)
