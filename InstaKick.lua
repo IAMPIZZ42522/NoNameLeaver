@@ -12,7 +12,6 @@ local config = {
     infJumpEnabled = false,
     espEnabled = false,
     antiRagdoll = false,
-    antiKB = false,
     speed = 32,
     minimized = false
 }
@@ -31,7 +30,7 @@ local screenGui = Instance.new("ScreenGui", CoreGui)
 screenGui.Name = "NoNameHub"; screenGui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame", screenGui)
-frame.Size = UDim2.new(0, 190, 0, 310) 
+frame.Size = UDim2.new(0, 190, 0, 290) 
 frame.Position = UDim2.new(config.pos[1], config.pos[2], config.pos[3], config.pos[4])
 frame.BackgroundColor3 = Color3.fromRGB(12,12,12); frame.BorderSizePixel = 0; frame.Active = true; frame.Draggable = true; frame.Visible = not config.minimized
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
@@ -41,14 +40,26 @@ local frameStroke = Instance.new("UIStroke", frame); frameStroke.Thickness = 1.5
 local scroll = Instance.new("ScrollingFrame", frame)
 scroll.Size = UDim2.new(1, 0, 1, -50); scroll.Position = UDim2.new(0, 0, 0, 30)
 scroll.BackgroundTransparency = 1; scroll.BorderSizePixel = 0; scroll.ScrollBarThickness = 2
-scroll.CanvasSize = UDim2.new(0, 0, 0, 500) 
+scroll.CanvasSize = UDim2.new(0, 0, 0, 480) 
 
 local layout = Instance.new("UIListLayout", scroll)
 layout.HorizontalAlignment = Enum.HorizontalAlignment.Center; layout.Padding = UDim.new(0, 8); layout.SortOrder = Enum.SortOrder.LayoutOrder
 
+-- BIG NN BUTTON (MINIMIZED)
+local minBox = Instance.new("TextButton", screenGui)
+minBox.Visible = config.minimized; minBox.Size = UDim2.new(0, 60, 0, 60); minBox.Position = frame.Position; minBox.BackgroundColor3 = Color3.fromRGB(12,12,12); minBox.Text = "NN"; minBox.Font = Enum.Font.GothamBold; minBox.TextColor3 = Color3.new(1,1,1); minBox.TextSize = 22; minBox.Draggable = true; Instance.new("UICorner", minBox).CornerRadius = UDim.new(0, 15)
+local minStroke = Instance.new("UIStroke", minBox); minStroke.Thickness = 1.5
+
+-- TITLE & CREDIT
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, -40, 0, 22); title.Position = UDim2.new(0, 10, 0, 5); title.BackgroundTransparency = 1; title.Text = "NoName Hub"; title.Font = Enum.Font.GothamMedium; title.TextSize = 12; title.TextColor3 = Color3.new(1,1,1); title.TextXAlignment = Enum.TextXAlignment.Left
+
+local credits = Instance.new("TextLabel", frame)
+credits.Size = UDim2.new(1, 0, 0, 15); credits.Position = UDim2.new(0, 0, 1, -18); credits.BackgroundTransparency = 1; credits.Text = "MrFuNnYnUtZ on TT"; credits.Font = Enum.Font.GothamMedium; credits.TextSize = 9; credits.TextColor3 = Color3.fromRGB(180,180,180)
+
 -- UI HELPERS
 local function createUtil(name)
-    local b = Instance.new("TextButton", scroll); b.Size = UDim2.new(0.85, 0, 0, 30); b.BackgroundColor3 = Color3.fromRGB(28,28,28); b.Text = name; b.Font = Enum.Font.GothamBold; b.TextSize = 10; b.TextColor3 = Color3.new(1,1,1)
+    local b = Instance.new("TextButton", scroll); b.Size = UDim2.new(0.85, 0, 0, 32); b.BackgroundColor3 = Color3.fromRGB(28,28,28); b.Text = name; b.Font = Enum.Font.GothamBold; b.TextSize = 10; b.TextColor3 = Color3.new(1,1,1)
     local s = Instance.new("UIStroke", b); s.Thickness = 1.2; Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8); return b, s
 end
 
@@ -77,19 +88,20 @@ local sBtn, sStr = createToggle("infJumpEnabled", "INF JUMP")
 local eBtn, eStr = createToggle("espEnabled", "PLAYER ESP")
 local rBtn, rStr = createToggle("antiRagdoll", "ANTI RAGDOLL")
 
--- MOVEMENT ENGINE (PULSE PHYSICS)
+-- ENGINE
 RunService.Stepped:Connect(function()
     local char = player.Character; local root = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
     if root and hum then
-        -- Safe Speed Boost: Uses MoveDirection with a Velocity Clamp
+        -- GHOST SPEED (CFRAME BASED)
         if config.boostEnabled and hum.MoveDirection.Magnitude > 0 then
-            root.AssemblyLinearVelocity = (hum.MoveDirection * config.speed) + Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
+            local speedMultiplier = (config.speed / 16) * 0.22 -- Calibrated for 50
+            root.CFrame = root.CFrame + (hum.MoveDirection * speedMultiplier)
         end
         
-        -- Inf Jump Pulse: Uses physical jumps to avoid auto-kill
+        -- GHOST JUMP (CONSTANT RISE)
         if config.infJumpEnabled and UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-            hum:ChangeState(Enum.HumanoidStateType.Jumping)
-            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 45, root.AssemblyLinearVelocity.Z)
+            root.CFrame = root.CFrame * CFrame.new(0, 0.5, 0) -- Smooth float
+            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z) -- Anti-Gravity
         end
 
         if config.antiRagdoll then 
@@ -103,15 +115,15 @@ end)
 local isSliding = false
 local function updateSlider(input)
     local p = math.clamp((input.Position.X - sliderFrame.AbsolutePosition.X) / sliderFrame.AbsoluteSize.X, 0, 1)
-    config.speed = math.floor(16 + (p * 34)) -- 16 to 50
-    speedValueLabel.Text = "Speed: " .. tostring(config.speed) .. (config.speed < 32 and " (Safe)" or " (Lag Risk)")
+    config.speed = math.floor(16 + (p * 34))
+    speedValueLabel.Text = "Speed: " .. tostring(config.speed) .. (config.speed < 32 and " (Safe)" or " (Fast)")
     sliderFill.Size = UDim2.new(p, 0, 1, 0); knob.Position = UDim2.new(p, -9, 0.5, -9)
 end
 sliderFrame.InputBegan:Connect(function(i) if (i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch) then isSliding = true; updateSlider(i) end end)
 UserInputService.InputChanged:Connect(function(i) if isSliding and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then updateSlider(i) end end)
 UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then isSliding = false; saveSettings() end end)
 
--- ESP & REJOIN
+-- ESP & UTILS
 local function applyESP(plr)
     if plr == player then return end
     RunService.RenderStepped:Connect(function()
@@ -127,8 +139,13 @@ game.Players.PlayerAdded:Connect(applyESP)
 resB.MouseButton1Click:Connect(function() if player.Character and player.Character:FindFirstChild("Humanoid") then player.Character.Humanoid.Health = 0 end end)
 rejB.MouseButton1Click:Connect(function() TeleportService:Teleport(game.PlaceId, player) end)
 
--- RAINBOW SYNC
+-- MINIMIZE/RAINBOW
+local minBtn = Instance.new("TextButton", frame)
+minBtn.Size = UDim2.new(0, 25, 0, 25); minBtn.Position = UDim2.new(1, -30, 0, 5); minBtn.BackgroundTransparency = 1; minBtn.Text = "-"; minBtn.Font = Enum.Font.GothamMedium; minBtn.TextSize = 20; minBtn.TextColor3 = Color3.new(1,1,1)
+minBtn.MouseButton1Click:Connect(function() config.minimized = true; frame.Visible = false; minBox.Visible = true; minBox.Position = frame.Position; saveSettings() end)
+minBox.MouseButton1Click:Connect(function() config.minimized = false; frame.Visible = true; minBox.Visible = false; frame.Position = minBox.Position; saveSettings() end)
+
 RunService.RenderStepped:Connect(function()
     local color = Color3.fromHSV(tick() % 5 / 5, 0.8, 1)
-    frameStroke.Color = color; resS.Color = color; rejS.Color = color; bStr.Color = color; sStr.Color = color; eStr.Color = color; rStr.Color = color; knob.BackgroundColor3 = color; sliderFill.BackgroundColor3 = color
+    frameStroke.Color = color; minStroke.Color = color; resS.Color = color; rejS.Color = color; bStr.Color = color; sStr.Color = color; eStr.Color = color; rStr.Color = color; knob.BackgroundColor3 = color; sliderFill.BackgroundColor3 = color
 end)
