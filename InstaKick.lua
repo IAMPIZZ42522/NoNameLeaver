@@ -86,58 +86,51 @@ local bBtn, bStr = createToggle("boostEnabled", "SPEED BOOST")
 local lockBtn, lockStr = createUtil(config.sliderLocked and "UNLOCK SLIDER" or "LOCK SLIDER")
 lockBtn.Size = UDim2.new(0.85, 0, 0, 25)
 
--- SLIDER (Locked Range)
+-- SLIDER
 local sliderFrame = Instance.new("Frame", scroll); sliderFrame.Size = UDim2.new(0.85, 0, 0, 10); sliderFrame.BackgroundColor3 = Color3.fromRGB(45,45,45); sliderFrame.BorderSizePixel = 0; Instance.new("UICorner", sliderFrame)
 local sliderFill = Instance.new("Frame", sliderFrame); sliderFill.Size = UDim2.new(((config.speed-16)/16), 0, 1, 0); sliderFill.BackgroundColor3 = Color3.new(1,1,1); Instance.new("UICorner", sliderFill)
 local knob = Instance.new("Frame", sliderFrame); knob.Size = UDim2.new(0, 18, 0, 18); knob.Position = UDim2.new(((config.speed-16)/16), -9, 0.5, -9); knob.BackgroundColor3 = Color3.new(1,1,1); Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
 local speedValueLabel = Instance.new("TextLabel", scroll); speedValueLabel.Size = UDim2.new(0.85, 0, 0, 15); speedValueLabel.BackgroundTransparency = 1; speedValueLabel.Text = "Speed: "..config.speed.." (Safe: <32)"; speedValueLabel.Font = Enum.Font.GothamMedium; speedValueLabel.TextSize = 9; speedValueLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
 
-lockBtn.MouseButton1Click:Connect(function()
-    config.sliderLocked = not config.sliderLocked
-    lockBtn.Text = config.sliderLocked and "UNLOCK SLIDER" or "LOCK SLIDER"
-    saveSettings()
-end)
+lockBtn.MouseButton1Click:Connect(function() config.sliderLocked = not config.sliderLocked; lockBtn.Text = config.sliderLocked and "UNLOCK SLIDER" or "LOCK SLIDER"; saveSettings() end)
 
 local sBtn, sStr = createToggle("infJumpEnabled", "INF JUMP")
 local eBtn, eStr = createToggle("espEnabled", "PLAYER ESP")
 local rBtn, rStr = createToggle("antiRagdoll", "ANTI RAGDOLL")
 local kBtn, kStr = createToggle("antiKB", "ANTI KNOCKBACK")
 
--- CORE ENGINE
+-- CORE LOOP (Sharp Turn + Velocity Override)
 RunService.Stepped:Connect(function()
     local color = config.sliderLocked and Color3.fromRGB(255, 50, 50) or Color3.fromHSV(tick() % 5 / 5, 0.8, 1)
     frameStroke.Color = color; minStroke.Color = color; knob.BackgroundColor3 = color; sliderFill.BackgroundColor3 = color
     resS.Color = color; rejS.Color = color; leaS.Color = color; bStr.Color = color; lockStr.Color = color; sStr.Color = color; eStr.Color = color; rStr.Color = color; kStr.Color = color
 
-    local char = player.Character; local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum then
-        -- BASIC SPEED: Using WalkSpeed directly instead of Velocity to reduce lag-back
-        if config.boostEnabled then
-            hum.WalkSpeed = config.speed
-        else
-            hum.WalkSpeed = 16
+    local char = player.Character; local root = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum and root then
+        if config.boostEnabled and hum.MoveDirection.Magnitude > 0 then
+            -- Restored the sharp-turn logic: Forces linear velocity to move direction
+            root.AssemblyLinearVelocity = (hum.MoveDirection * config.speed) + Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
         end
         if config.antiRagdoll then hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false); hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end
     end
 end)
 
--- CLASSIC INF JUMP + HOLD TO JUMP
-local jumping = false
-UserInputService.InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.Space then jumping = true end
+-- INF JUMP (HOLD TO FLY / NO PULLBACK)
+local isJumping = false
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.Space then isJumping = true end
 end)
 UserInputService.InputEnded:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.Space then jumping = false end
+    if input.KeyCode == Enum.KeyCode.Space then isJumping = false end
 end)
 
--- The "Basic" Method loop
-task.spawn(function()
-    while task.wait(0.1) do
-        if config.infJumpEnabled and jumping then
-            local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-            if hum then
-                hum:ChangeState(Enum.HumanoidStateType.Jumping)
-            end
+RunService.RenderStepped:Connect(function()
+    if config.infJumpEnabled and isJumping then
+        local char = player.Character; local root = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if root and hum then
+            -- Force state AND velocity to prevent the "Double Jump Only" bug
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 50, root.AssemblyLinearVelocity.Z)
         end
     end
 end)
