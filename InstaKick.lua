@@ -13,7 +13,7 @@ local config = {
     espEnabled = false,
     antiRagdoll = false,
     antiKB = false,
-    speed = 32,
+    speed = 30, -- Dropped default slightly for safety
     minimized = false,
     sliderLocked = false
 }
@@ -113,7 +113,9 @@ RunService.Stepped:Connect(function()
     local char = player.Character; local root = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum and root then
         if config.boostEnabled and hum.MoveDirection.Magnitude > 0 then
-            root.AssemblyLinearVelocity = (hum.MoveDirection * config.speed) + Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
+            -- JITTER FIX: Fluctuate speed slightly to bypass static velocity checks
+            local jitter = (math.random(-5, 5) / 10) 
+            root.AssemblyLinearVelocity = (hum.MoveDirection * (config.speed + jitter)) + Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
         end
         if config.antiRagdoll then hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false); hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end
         if config.antiKB and not config.boostEnabled and not config.infJumpEnabled then 
@@ -122,16 +124,18 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- INF JUMP (SYNCED + PULLBACK FIX)
+-- INF JUMP (BODYVELOCITY BYPASS)
 UserInputService.JumpRequest:Connect(function()
     if config.infJumpEnabled and player.Character then
         local root = player.Character:FindFirstChild("HumanoidRootPart")
-        local hum = player.Character:FindFirstChildOfClass("Humanoid")
-        if root and hum then 
-            -- Synced Velocity
-            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 58, root.AssemblyLinearVelocity.Z) 
-            -- State Change (Forces server to accept the vertical move)
-            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        if root then 
+            -- Using BodyVelocity is safer than direct velocity for high-jumping
+            local bv = Instance.new("BodyVelocity")
+            bv.Velocity = Vector3.new(0, 55, 0)
+            bv.MaxForce = Vector3.new(0, math.huge, 0)
+            bv.Parent = root
+            task.wait(0.1) -- Duration of the jump push
+            bv:Destroy()
         end
     end
 end)
