@@ -3,10 +3,12 @@ local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
 
 local FILE_NAME = "NoNameHub.json"
 local boostEnabled = false
-local boostSpeed = 32 -- Perfectly balanced for high speed without the kick
+local infJumpEnabled = false
+local boostSpeed = 32 
 
 local function loadPosition()
     if readfile and isfile and isfile(FILE_NAME) then
@@ -27,7 +29,7 @@ screenGui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame")
 frame.Parent = screenGui
-frame.Size = UDim2.new(0, 190, 0, 195)
+frame.Size = UDim2.new(0, 190, 0, 260) -- Added height for new toggle
 frame.Position = loadPosition()
 frame.BackgroundColor3 = Color3.fromRGB(18,18,18)
 frame.BorderSizePixel = 0
@@ -36,149 +38,103 @@ frame.Draggable = true
 
 local frameCorner = Instance.new("UICorner", frame)
 frameCorner.CornerRadius = UDim.new(0, 10)
-
 local frameStroke = Instance.new("UIStroke", frame)
 frameStroke.Thickness = 1
 
-frame:GetPropertyChangedSignal("Position"):Connect(function()
-    if writefile then
-        local pos = frame.Position
-        local data = {XScale = pos.X.Scale, XOffset = pos.X.Offset, YScale = pos.Y.Scale, YOffset = pos.Y.Offset}
-        writefile(FILE_NAME, HttpService:JSONEncode(data))
+-- UI HEADER & MINIMIZE
+local minBox = Instance.new("TextButton")
+minBox.Parent = screenGui; minBox.Visible = false; minBox.Size = UDim2.new(0, 45, 0, 45)
+minBox.BackgroundColor3 = Color3.fromRGB(18,18,18); minBox.Text = "NN"; minBox.Font = Enum.Font.GothamMedium
+minBox.TextSize = 18; minBox.Draggable = true; Instance.new("UICorner", minBox).CornerRadius = UDim.new(0, 10)
+local minStroke = Instance.new("UIStroke", minBox); minStroke.Thickness = 1
+
+local minBtn = Instance.new("TextButton")
+minBtn.Parent = frame; minBtn.Size = UDim2.new(0, 25, 0, 25); minBtn.Position = UDim2.new(1, -30, 0, 5)
+minBtn.BackgroundTransparency = 1; minBtn.Text = "-"; minBtn.Font = Enum.Font.GothamMedium; minBtn.TextSize = 20; minBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+local title = Instance.new("TextLabel")
+title.Parent = frame; title.Size = UDim2.new(1, -40, 0, 22); title.Position = UDim2.new(0, 10, 0, 5)
+title.BackgroundTransparency = 1; title.Text = "NoName Hub"; title.Font = Enum.Font.GothamMedium; title.TextSize = 12; title.TextColor3 = Color3.fromRGB(240,240,240); title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- SPEED TOGGLE
+local boostBtn = Instance.new("TextButton")
+boostBtn.Parent = frame; boostBtn.Size = UDim2.new(0.85, 0, 0, 28); boostBtn.Position = UDim2.new(0.075, 0, 0.12, 0)
+boostBtn.BackgroundColor3 = Color3.fromRGB(28,28,28); boostBtn.Text = "SPEED BOOST: OFF"; boostBtn.Font = Enum.Font.GothamMedium; boostBtn.TextSize = 10; boostBtn.TextColor3 = Color3.fromRGB(255,255,255)
+Instance.new("UICorner", boostBtn).CornerRadius = UDim.new(0, 8); local boostStroke = Instance.new("UIStroke", boostBtn)
+
+-- INF JUMP TOGGLE
+local jumpBtn = Instance.new("TextButton")
+jumpBtn.Parent = frame; jumpBtn.Size = UDim2.new(0.85, 0, 0, 28); jumpBtn.Position = UDim2.new(0.075, 0, 0.25, 0)
+jumpBtn.BackgroundColor3 = Color3.fromRGB(28,28,28); jumpBtn.Text = "INF JUMP: OFF"; jumpBtn.Font = Enum.Font.GothamMedium; jumpBtn.TextSize = 10; jumpBtn.TextColor3 = Color3.fromRGB(255,255,255)
+Instance.new("UICorner", jumpBtn).CornerRadius = UDim.new(0, 8); local jumpStroke = Instance.new("UIStroke", jumpBtn)
+
+-- SLIDER UI
+local sliderFrame = Instance.new("Frame")
+sliderFrame.Parent = frame; sliderFrame.Size = UDim2.new(0.85, 0, 0, 4); sliderFrame.Position = UDim2.new(0.075, 0, 0.42, 0)
+sliderFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45); sliderFrame.BorderSizePixel = 0
+local sliderFill = Instance.new("Frame"); sliderFill.Parent = sliderFrame; sliderFill.Size = UDim2.new(0.4, 0, 1, 0); sliderFill.BorderSizePixel = 0
+local knob = Instance.new("TextButton"); knob.Parent = sliderFrame; knob.Size = UDim2.new(0, 12, 0, 12); knob.Position = UDim2.new(0.4, -6, 0.5, -6); knob.Text = ""; Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+
+local speedValueLabel = Instance.new("TextLabel")
+speedValueLabel.Parent = frame; speedValueLabel.Size = UDim2.new(0.85, 0, 0, 15); speedValueLabel.Position = UDim2.new(0.075, 0, 0.45, 0)
+speedValueLabel.BackgroundTransparency = 1; speedValueLabel.Text = "Speed: 32"; speedValueLabel.Font = Enum.Font.GothamMedium; speedValueLabel.TextSize = 9; speedValueLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+
+-- UTILITY BUTTONS
+local function createBtn(name, pos)
+    local b = Instance.new("TextButton"); b.Parent = frame; b.Size = UDim2.new(0.85, 0, 0, 22); b.Position = pos
+    b.BackgroundColor3 = Color3.fromRGB(28,28,28); b.Text = name; b.Font = Enum.Font.GothamMedium; b.TextSize = 9; b.TextColor3 = Color3.fromRGB(255,255,255)
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8); return b, Instance.new("UIStroke", b)
+end
+local respawnButton, respawnStroke = createBtn("RESPAWN", UDim2.new(0.075, 0, 0.58, 0))
+local rejoinButton, rejoinStroke = createBtn("REJOIN", UDim2.new(0.075, 0, 0.71, 0))
+local leaveButton, leaveStroke = createBtn("LEAVE", UDim2.new(0.075, 0, 0.84, 0))
+
+-- SLIDER LOGIC
+local dragging = false
+knob.MouseButton1Down:Connect(function() dragging = true end)
+UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
+UserInputService.InputChanged:Connect(function(i)
+    if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
+        local percentage = math.clamp((UserInputService:GetMouseLocation().X - sliderFrame.AbsolutePosition.X) / sliderFrame.AbsoluteSize.X, 0, 1)
+        knob.Position = UDim2.new(percentage, -6, 0.5, -6); sliderFill.Size = UDim2.new(percentage, 0, 1, 0)
+        boostSpeed = math.floor(16 + (percentage * 34)); speedValueLabel.Text = "Speed: " .. tostring(boostSpeed)
     end
 end)
 
--- MINIMIZED BOX (NN)
-local minBox = Instance.new("TextButton")
-minBox.Parent = screenGui
-minBox.Visible = false
-minBox.Size = UDim2.new(0, 45, 0, 45)
-minBox.Position = frame.Position
-minBox.BackgroundColor3 = Color3.fromRGB(18,18,18)
-minBox.Text = "NN"
-minBox.Font = Enum.Font.GothamMedium
-minBox.TextSize = 18
-minBox.Draggable = true
-Instance.new("UICorner", minBox).CornerRadius = UDim.new(0, 10)
-local minStroke = Instance.new("UIStroke", minBox)
-minStroke.Thickness = 1
-
--- MINIMIZE BUTTON
-local minBtn = Instance.new("TextButton")
-minBtn.Parent = frame
-minBtn.Size = UDim2.new(0, 25, 0, 25)
-minBtn.Position = UDim2.new(1, -30, 0, 5)
-minBtn.BackgroundTransparency = 1
-minBtn.Text = "-"
-minBtn.Font = Enum.Font.GothamMedium
-minBtn.TextSize = 20
-minBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-
-local title = Instance.new("TextLabel")
-title.Parent = frame
-title.Size = UDim2.new(1, -40, 0, 22)
-title.Position = UDim2.new(0, 10, 0, 5)
-title.BackgroundTransparency = 1
-title.Text = "NoName Hub"
-title.Font = Enum.Font.GothamMedium
-title.TextSize = 12
-title.TextColor3 = Color3.fromRGB(240,240,240)
-title.TextXAlignment = Enum.TextXAlignment.Left
-
-local function createBtn(name, pos)
-    local b = Instance.new("TextButton")
-    b.Parent = frame
-    b.Size = UDim2.new(0.85, 0, 0, 30)
-    b.Position = pos
-    b.BackgroundColor3 = Color3.fromRGB(28,28,28)
-    b.Text = name
-    b.Font = Enum.Font.GothamMedium
-    b.TextSize = 11
-    b.TextColor3 = Color3.fromRGB(255,255,255)
-    b.BorderSizePixel = 0
-    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
-    local s = Instance.new("UIStroke", b)
-    s.Thickness = 1
-    return b, s
-end
-
-local boostBtn, boostStroke = createBtn("SPEED BOOST: OFF", UDim2.new(0.075, 0, 0.18, 0))
-local respawnButton, respawnStroke = createBtn("RESPAWN", UDim2.new(0.075, 0, 0.38, 0))
-local rejoinButton, rejoinStroke = createBtn("REJOIN", UDim2.new(0.075, 0, 0.58, 0))
-local leaveButton, leaveStroke = createBtn("LEAVE", UDim2.new(0.075, 0, 0.78, 0))
-
-local credit = Instance.new("TextLabel")
-credit.Parent = frame
-credit.Size = UDim2.new(1, -10, 0, 10)
-credit.Position = UDim2.new(0, 0, 1, -12)
-credit.BackgroundTransparency = 1
-credit.Text = "@MrFuNnYnUtZ on TT"
-credit.Font = Enum.Font.GothamMedium
-credit.TextSize = 8
-credit.TextColor3 = Color3.fromRGB(110,110,110)
-credit.TextXAlignment = Enum.TextXAlignment.Right
-
--- SMOOTH VELOCITY LERP METHOD
+-- SEASONED SAUCE + INF JUMP PHYSICS
 RunService.Stepped:Connect(function()
     local color = Color3.fromHSV(tick() % 5 / 5, 1, 1)
-    frameStroke.Color = color
-    minStroke.Color = color
-    minBox.TextColor3 = color
-    boostStroke.Color = color
-    respawnStroke.Color = color
-    rejoinStroke.Color = color
-    leaveStroke.Color = color
+    frameStroke.Color = color; minStroke.Color = color; knob.BackgroundColor3 = color; sliderFill.BackgroundColor3 = color
+    boostStroke.Color = color; jumpStroke.Color = color; respawnStroke.Color = color; rejoinStroke.Color = color; leaveStroke.Color = color
 
     if boostEnabled then
-        local char = player.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        
-        if root and hum then
-            if hum.MoveDirection.Magnitude > 0 then
-                -- Lerp Velocity: Smoothly transition to 32 speed to avoid "Spike" kicks
-                local targetVel = Vector3.new(hum.MoveDirection.X * boostSpeed, root.AssemblyLinearVelocity.Y, hum.MoveDirection.Z * boostSpeed)
-                root.AssemblyLinearVelocity = root.AssemblyLinearVelocity:Lerp(targetVel, 0.5)
-                
-                -- State Lock: Prevents "Trip" or "Fall" flags while carrying heavy items
-                if hum:GetState() ~= Enum.HumanoidStateType.Running then
-                    hum:ChangeState(Enum.HumanoidStateType.Running)
-                end
-            else
-                -- Immediate stop to prevent "Sliding" kicks
-                root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
-            end
+        local char = player.Character; local root = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if root and hum and hum.MoveDirection.Magnitude > 0 then
+            -- The "Seasoned" Part: Stronger Lerp + Air Velocity Lock
+            local yVel = root.AssemblyLinearVelocity.Y
+            local targetVel = Vector3.new(hum.MoveDirection.X * boostSpeed, yVel, hum.MoveDirection.Z * boostSpeed)
+            root.AssemblyLinearVelocity = root.AssemblyLinearVelocity:Lerp(targetVel, 0.6) -- Seasoned weight
+            hum:ChangeState(Enum.HumanoidStateType.Running)
         end
     end
 end)
 
--- TOGGLE LOGIC
-boostBtn.MouseButton1Click:Connect(function()
-    boostEnabled = not boostEnabled
-    boostBtn.Text = "SPEED BOOST: " .. (boostEnabled and "ON" or "OFF")
+-- INFINITE JUMP LOGIC (LAGBACK BYPASS)
+UserInputService.JumpRequest:Connect(function()
+    if infJumpEnabled then
+        local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            -- Reset state to allow jump & bypass anti-cheat vertical check
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
 end)
 
-minBtn.MouseButton1Click:Connect(function()
-    frame.Visible = false
-    minBox.Visible = true
-    minBox.Position = frame.Position
-end)
-
-minBox.MouseButton1Click:Connect(function()
-    minBox.Visible = false
-    frame.Visible = true
-    frame.Position = minBox.Position
-end)
-
-respawnButton.MouseButton1Click:Connect(function()
-    local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-    if hum then hum.Health = 0 end
-end)
-
-rejoinButton.MouseButton1Click:Connect(function()
-    TeleportService:Teleport(game.PlaceId, player)
-end)
-
-leaveButton.MouseButton1Click:Connect(function()
-    player:Kick("Left via NoName Hub")
-end)
+-- BUTTON TOGGLES
+boostBtn.MouseButton1Click:Connect(function() boostEnabled = not boostEnabled; boostBtn.Text = "SPEED BOOST: " .. (boostEnabled and "ON" or "OFF") end)
+jumpBtn.MouseButton1Click:Connect(function() infJumpEnabled = not infJumpEnabled; jumpBtn.Text = "INF JUMP: " .. (infJumpEnabled and "ON" or "OFF") end)
+minBtn.MouseButton1Click:Connect(function() frame.Visible = false; minBox.Visible = true; minBox.Position = frame.Position end)
+minBox.MouseButton1Click:Connect(function() minBox.Visible = false; frame.Visible = true; frame.Position = minBox.Position end)
+respawnButton.MouseButton1Click:Connect(function() if player.Character and player.Character:FindFirstChild("Humanoid") then player.Character.Humanoid.Health = 0 end end)
+rejoinButton.MouseButton1Click:Connect(function() TeleportService:Teleport(game.PlaceId, player) end)
+leaveButton.MouseButton1Click:Connect(function() player:Kick("Left via NoName Hub") end)
