@@ -29,7 +29,7 @@ screenGui.ResetOnSpawn = false
 
 local frame = Instance.new("Frame")
 frame.Parent = screenGui
-frame.Size = UDim2.new(0, 190, 0, 260) -- Added height for new toggle
+frame.Size = UDim2.new(0, 190, 0, 260) 
 frame.Position = loadPosition()
 frame.BackgroundColor3 = Color3.fromRGB(18,18,18)
 frame.BorderSizePixel = 0
@@ -62,22 +62,22 @@ boostBtn.Parent = frame; boostBtn.Size = UDim2.new(0.85, 0, 0, 28); boostBtn.Pos
 boostBtn.BackgroundColor3 = Color3.fromRGB(28,28,28); boostBtn.Text = "SPEED BOOST: OFF"; boostBtn.Font = Enum.Font.GothamMedium; boostBtn.TextSize = 10; boostBtn.TextColor3 = Color3.fromRGB(255,255,255)
 Instance.new("UICorner", boostBtn).CornerRadius = UDim.new(0, 8); local boostStroke = Instance.new("UIStroke", boostBtn)
 
--- INF JUMP TOGGLE
-local jumpBtn = Instance.new("TextButton")
-jumpBtn.Parent = frame; jumpBtn.Size = UDim2.new(0.85, 0, 0, 28); jumpBtn.Position = UDim2.new(0.075, 0, 0.25, 0)
-jumpBtn.BackgroundColor3 = Color3.fromRGB(28,28,28); jumpBtn.Text = "INF JUMP: OFF"; jumpBtn.Font = Enum.Font.GothamMedium; jumpBtn.TextSize = 10; jumpBtn.TextColor3 = Color3.fromRGB(255,255,255)
-Instance.new("UICorner", jumpBtn).CornerRadius = UDim.new(0, 8); local jumpStroke = Instance.new("UIStroke", jumpBtn)
-
--- SLIDER UI
+-- SLIDER UI (Moved directly under Speed Boost)
 local sliderFrame = Instance.new("Frame")
-sliderFrame.Parent = frame; sliderFrame.Size = UDim2.new(0.85, 0, 0, 4); sliderFrame.Position = UDim2.new(0.075, 0, 0.42, 0)
+sliderFrame.Parent = frame; sliderFrame.Size = UDim2.new(0.85, 0, 0, 4); sliderFrame.Position = UDim2.new(0.075, 0, 0.28, 0)
 sliderFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45); sliderFrame.BorderSizePixel = 0
 local sliderFill = Instance.new("Frame"); sliderFill.Parent = sliderFrame; sliderFill.Size = UDim2.new(0.4, 0, 1, 0); sliderFill.BorderSizePixel = 0
 local knob = Instance.new("TextButton"); knob.Parent = sliderFrame; knob.Size = UDim2.new(0, 12, 0, 12); knob.Position = UDim2.new(0.4, -6, 0.5, -6); knob.Text = ""; Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
 
 local speedValueLabel = Instance.new("TextLabel")
-speedValueLabel.Parent = frame; speedValueLabel.Size = UDim2.new(0.85, 0, 0, 15); speedValueLabel.Position = UDim2.new(0.075, 0, 0.45, 0)
+speedValueLabel.Parent = frame; speedValueLabel.Size = UDim2.new(0.85, 0, 0, 15); speedValueLabel.Position = UDim2.new(0.075, 0, 0.31, 0)
 speedValueLabel.BackgroundTransparency = 1; speedValueLabel.Text = "Speed: 32"; speedValueLabel.Font = Enum.Font.GothamMedium; speedValueLabel.TextSize = 9; speedValueLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+
+-- INF JUMP TOGGLE
+local jumpBtn = Instance.new("TextButton")
+jumpBtn.Parent = frame; jumpBtn.Size = UDim2.new(0.85, 0, 0, 28); jumpBtn.Position = UDim2.new(0.075, 0, 0.42, 0)
+jumpBtn.BackgroundColor3 = Color3.fromRGB(28,28,28); jumpBtn.Text = "INF JUMP: OFF"; jumpBtn.Font = Enum.Font.GothamMedium; jumpBtn.TextSize = 10; jumpBtn.TextColor3 = Color3.fromRGB(255,255,255)
+Instance.new("UICorner", jumpBtn).CornerRadius = UDim.new(0, 8); local jumpStroke = Instance.new("UIStroke", jumpBtn)
 
 -- UTILITY BUTTONS
 local function createBtn(name, pos)
@@ -89,19 +89,26 @@ local respawnButton, respawnStroke = createBtn("RESPAWN", UDim2.new(0.075, 0, 0.
 local rejoinButton, rejoinStroke = createBtn("REJOIN", UDim2.new(0.075, 0, 0.71, 0))
 local leaveButton, leaveStroke = createBtn("LEAVE", UDim2.new(0.075, 0, 0.84, 0))
 
--- SLIDER LOGIC
+-- FIXED SLIDER LOGIC
 local dragging = false
 knob.MouseButton1Down:Connect(function() dragging = true end)
 UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
-UserInputService.InputChanged:Connect(function(i)
-    if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
-        local percentage = math.clamp((UserInputService:GetMouseLocation().X - sliderFrame.AbsolutePosition.X) / sliderFrame.AbsoluteSize.X, 0, 1)
-        knob.Position = UDim2.new(percentage, -6, 0.5, -6); sliderFill.Size = UDim2.new(percentage, 0, 1, 0)
-        boostSpeed = math.floor(16 + (percentage * 34)); speedValueLabel.Text = "Speed: " .. tostring(boostSpeed)
+
+RunService.RenderStepped:Connect(function()
+    if dragging then
+        local mousePos = UserInputService:GetMouseLocation().X
+        local sliderPos = sliderFrame.AbsolutePosition.X
+        local sliderWidth = sliderFrame.AbsoluteSize.X
+        local percentage = math.clamp((mousePos - sliderPos) / sliderWidth, 0, 1)
+        
+        knob.Position = UDim2.new(percentage, -6, 0.5, -6)
+        sliderFill.Size = UDim2.new(percentage, 0, 1, 0)
+        boostSpeed = math.floor(16 + (percentage * 34))
+        speedValueLabel.Text = "Speed: " .. tostring(boostSpeed)
     end
 end)
 
--- SEASONED SAUCE + INF JUMP PHYSICS
+-- PHYSICS LOOP
 RunService.Stepped:Connect(function()
     local color = Color3.fromHSV(tick() % 5 / 5, 1, 1)
     frameStroke.Color = color; minStroke.Color = color; knob.BackgroundColor3 = color; sliderFill.BackgroundColor3 = color
@@ -110,21 +117,22 @@ RunService.Stepped:Connect(function()
     if boostEnabled then
         local char = player.Character; local root = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
         if root and hum and hum.MoveDirection.Magnitude > 0 then
-            -- The "Seasoned" Part: Stronger Lerp + Air Velocity Lock
-            local yVel = root.AssemblyLinearVelocity.Y
-            local targetVel = Vector3.new(hum.MoveDirection.X * boostSpeed, yVel, hum.MoveDirection.Z * boostSpeed)
-            root.AssemblyLinearVelocity = root.AssemblyLinearVelocity:Lerp(targetVel, 0.6) -- Seasoned weight
+            local targetVel = Vector3.new(hum.MoveDirection.X * boostSpeed, root.AssemblyLinearVelocity.Y, hum.MoveDirection.Z * boostSpeed)
+            root.AssemblyLinearVelocity = root.AssemblyLinearVelocity:Lerp(targetVel, 0.6)
             hum:ChangeState(Enum.HumanoidStateType.Running)
         end
     end
 end)
 
--- INFINITE JUMP LOGIC (LAGBACK BYPASS)
+-- STABLE INF JUMP (BYPASS RESPOND)
 UserInputService.JumpRequest:Connect(function()
     if infJumpEnabled then
-        local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-        if hum then
-            -- Reset state to allow jump & bypass anti-cheat vertical check
+        local char = player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if hum and root then
+            -- Reset Y Velocity before jumping to stop the "Instant Respawn" trigger
+            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 50, root.AssemblyLinearVelocity.Z)
             hum:ChangeState(Enum.HumanoidStateType.Jumping)
         end
     end
