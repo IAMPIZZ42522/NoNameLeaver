@@ -6,7 +6,7 @@ local CoreGui = game:GetService("CoreGui")
 
 local FILE_NAME = "NoNameHub.json"
 local boostEnabled = false
-local boostSpeed = 31.5 -- Precision tuned to stay under strict server checks
+local boostSpeed = 31 -- Safe "Boss" speed
 
 local function loadPosition()
     if readfile and isfile and isfile(FILE_NAME) then
@@ -118,8 +118,8 @@ credit.TextSize = 8
 credit.TextColor3 = Color3.fromRGB(110,110,110)
 credit.TextXAlignment = Enum.TextXAlignment.Right
 
--- STEALTH PULSE METHOD
-RunService.PostSimulation:Connect(function()
+-- RAINBOW & BYPASS SPEED
+RunService.RenderStepped:Connect(function()
     local color = Color3.fromHSV(tick() % 5 / 5, 1, 1)
     frameStroke.Color = color
     minStroke.Color = color
@@ -131,23 +131,13 @@ RunService.PostSimulation:Connect(function()
 
     if boostEnabled then
         local char = player.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
         local hum = char and char:FindFirstChildOfClass("Humanoid")
-        
-        if root and hum then
-            if hum.MoveDirection.Magnitude > 0 then
-                -- MoveDirection based velocity injection
-                -- We use PostSimulation to ensure we are the LAST thing to touch the character physics
-                local dir = hum.MoveDirection
-                root.AssemblyLinearVelocity = Vector3.new(dir.X * boostSpeed, root.AssemblyLinearVelocity.Y, dir.Z * boostSpeed)
-                
-                -- Anti-Trip state locking
-                if hum:GetState() == Enum.HumanoidStateType.FallingDown or hum:GetState() == Enum.HumanoidStateType.PlatformStanding then
-                    hum:ChangeState(Enum.HumanoidStateType.Running)
-                end
-            else
-                -- Instant Friction Stop
-                root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
+        if hum then
+            -- Bypass "Slowdown" by force-writing WalkSpeed every frame
+            hum.WalkSpeed = boostSpeed
+            -- Force "Running" state so the server doesn't think you are falling/lagging
+            if hum:GetState() ~= Enum.HumanoidStateType.Running then
+                hum:ChangeState(Enum.HumanoidStateType.Running)
             end
         end
     end
@@ -157,6 +147,10 @@ end)
 boostBtn.MouseButton1Click:Connect(function()
     boostEnabled = not boostEnabled
     boostBtn.Text = "SPEED BOOST: " .. (boostEnabled and "ON" or "OFF")
+    if not boostEnabled and player.Character then
+        local hum = player.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum.WalkSpeed = 16 end
+    end
 end)
 
 minBtn.MouseButton1Click:Connect(function()
