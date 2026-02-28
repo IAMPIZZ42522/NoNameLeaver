@@ -13,7 +13,7 @@ local config = {
     espEnabled = false,
     antiRagdoll = false,
     antiKB = false,
-    speed = 30, -- Dropped default slightly for safety
+    speed = 32,
     minimized = false,
     sliderLocked = false
 }
@@ -95,7 +95,6 @@ local speedValueLabel = Instance.new("TextLabel", scroll); speedValueLabel.Size 
 lockBtn.MouseButton1Click:Connect(function()
     config.sliderLocked = not config.sliderLocked
     lockBtn.Text = config.sliderLocked and "UNLOCK SLIDER" or "LOCK SLIDER"
-    sliderFrame.BackgroundTransparency = config.sliderLocked and 0.5 or 0
     saveSettings()
 end)
 
@@ -105,6 +104,7 @@ local rBtn, rStr = createToggle("antiRagdoll", "ANTI RAGDOLL")
 local kBtn, kStr = createToggle("antiKB", "ANTI KNOCKBACK")
 
 -- CORE LOOP
+local tickCounter = 0
 RunService.Stepped:Connect(function()
     local color = config.sliderLocked and Color3.fromRGB(255, 50, 50) or Color3.fromHSV(tick() % 5 / 5, 0.8, 1)
     frameStroke.Color = color; minStroke.Color = color; knob.BackgroundColor3 = color; sliderFill.BackgroundColor3 = color
@@ -113,9 +113,10 @@ RunService.Stepped:Connect(function()
     local char = player.Character; local root = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum and root then
         if config.boostEnabled and hum.MoveDirection.Magnitude > 0 then
-            -- JITTER FIX: Fluctuate speed slightly to bypass static velocity checks
-            local jitter = (math.random(-5, 5) / 10) 
-            root.AssemblyLinearVelocity = (hum.MoveDirection * (config.speed + jitter)) + Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
+            tickCounter = tickCounter + 1
+            -- RESET PULSE: Every 120 frames (~2 secs), drop speed to 16 for 1 frame to reset server checks
+            local targetSpeed = (tickCounter % 120 == 0) and 16 or config.speed
+            root.AssemblyLinearVelocity = (hum.MoveDirection * targetSpeed) + Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
         end
         if config.antiRagdoll then hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false); hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end
         if config.antiKB and not config.boostEnabled and not config.infJumpEnabled then 
@@ -124,18 +125,13 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- INF JUMP (BODYVELOCITY BYPASS)
+-- INF JUMP (CFRAME TELEPORT - NO VELOCITY)
 UserInputService.JumpRequest:Connect(function()
     if config.infJumpEnabled and player.Character then
         local root = player.Character:FindFirstChild("HumanoidRootPart")
         if root then 
-            -- Using BodyVelocity is safer than direct velocity for high-jumping
-            local bv = Instance.new("BodyVelocity")
-            bv.Velocity = Vector3.new(0, 55, 0)
-            bv.MaxForce = Vector3.new(0, math.huge, 0)
-            bv.Parent = root
-            task.wait(0.1) -- Duration of the jump push
-            bv:Destroy()
+            -- "Nudge" the character up instantly. This is invisible to velocity-based anti-cheats.
+            root.CFrame = root.CFrame * CFrame.new(0, 5, 0)
         end
     end
 end)
@@ -145,8 +141,8 @@ local isSliding = false
 local function updateSlider(input)
     if config.sliderLocked then return end
     local p = math.clamp((input.Position.X - sliderFrame.AbsolutePosition.X) / sliderFrame.AbsoluteSize.X, 0, 1)
-    config.speed = math.floor(16 + (p * 34))
-    speedValueLabel.Text = "Speed: " .. tostring(config.speed) .. " (Safe: <32)"
+    config.speed = math.floor(16 + (p * 54)) -- Increased slider range to 70
+    speedValueLabel.Text = "Speed: " .. tostring(config.speed)
     sliderFill.Size = UDim2.new(p, 0, 1, 0); knob.Position = UDim2.new(p, -9, 0.5, -9)
 end
 sliderFrame.InputBegan:Connect(function(i) if (i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch) and not config.sliderLocked then isSliding = true; updateSlider(i) end end)
