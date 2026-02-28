@@ -25,8 +25,9 @@ frame.BackgroundColor3 = Color3.fromRGB(12,12,12); frame.BorderSizePixel = 0; fr
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
 local frameStroke = Instance.new("UIStroke", frame); frameStroke.Thickness = 1.5
 
+-- SCROLLING UI
 local scroll = Instance.new("ScrollingFrame", frame)
-scroll.Size = UDim2.new(1, 0, 1, -50); scroll.Position = UDim2.new(0, 0, 0, 30); scroll.BackgroundTransparency = 1; scroll.BorderSizePixel = 0; scroll.CanvasSize = UDim2.new(0, 0, 0, 480) 
+scroll.Size = UDim2.new(1, 0, 1, -50); scroll.Position = UDim2.new(0, 0, 0, 30); scroll.BackgroundTransparency = 1; scroll.BorderSizePixel = 0; scroll.CanvasSize = UDim2.new(0, 0, 0, 520) 
 local layout = Instance.new("UIListLayout", scroll); layout.HorizontalAlignment = Enum.HorizontalAlignment.Center; layout.Padding = UDim.new(0, 8); layout.SortOrder = Enum.SortOrder.LayoutOrder
 
 -- TITLE & CREDITS
@@ -47,42 +48,38 @@ local function createToggle(prop, text)
     return btn, str
 end
 
+-- UTILITY BUTTONS
 local resB, resS = createUtil("RESPAWN")
 local rejB, rejS = createUtil("REJOIN")
+local leaB, leaS = createUtil("LEAVE") -- RESTORED
 local bBtn, bStr = createToggle("boostEnabled", "SPEED BOOST")
 
 -- SLIDER (16 TO 50)
 local sliderFrame = Instance.new("Frame", scroll); sliderFrame.Size = UDim2.new(0.85, 0, 0, 10); sliderFrame.BackgroundColor3 = Color3.fromRGB(45,45,45); sliderFrame.BorderSizePixel = 0; Instance.new("UICorner", sliderFrame)
 local sliderFill = Instance.new("Frame", sliderFrame); sliderFill.Size = UDim2.new(((config.speed-16)/34), 0, 1, 0); sliderFill.BackgroundColor3 = Color3.new(1,1,1); Instance.new("UICorner", sliderFill)
 local knob = Instance.new("Frame", sliderFrame); knob.Size = UDim2.new(0, 18, 0, 18); knob.Position = UDim2.new(((config.speed-16)/34), -9, 0.5, -9); knob.BackgroundColor3 = Color3.new(1,1,1); Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
-local speedValueLabel = Instance.new("TextLabel", scroll); speedValueLabel.Size = UDim2.new(0.85, 0, 0, 15); speedValueLabel.BackgroundTransparency = 1; speedValueLabel.Text = "Speed: "..config.speed; speedValueLabel.Font = Enum.Font.GothamMedium; speedValueLabel.TextSize = 9; speedValueLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+local speedValueLabel = Instance.new("TextLabel", scroll); speedValueLabel.Size = UDim2.new(0.85, 0, 0, 15); speedValueLabel.BackgroundTransparency = 1; speedValueLabel.Text = "Speed: "..config.speed.." (Safe: <32)"; speedValueLabel.Font = Enum.Font.GothamMedium; speedValueLabel.TextSize = 9; speedValueLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
 
 local sBtn, sStr = createToggle("infJumpEnabled", "INF JUMP")
 local eBtn, eStr = createToggle("espEnabled", "PLAYER ESP")
 local rBtn, rStr = createToggle("antiRagdoll", "ANTI RAGDOLL")
 
--- BYPASS ENGINE
-local isJumping = false
-UserInputService.JumpRequest:Connect(function()
-    if config.infJumpEnabled then
-        local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
-    end
-end)
-
-RunService.Heartbeat:Connect(function(dt)
+-- ENGINE (ANTI-DETECTION LOGIC)
+RunService.Stepped:Connect(function()
     local char = player.Character; local root = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
     if root and hum then
-        -- Anti-Pullback Speed (Using Delta-Time to stay smooth)
+        -- Anti-Kill Speed (Micro-CFrame movement)
         if config.boostEnabled and hum.MoveDirection.Magnitude > 0 then
-            local speedPerFrame = (config.speed - 16) * dt
-            root.CFrame = root.CFrame + (hum.MoveDirection * speedPerFrame)
+            local bypassMultiplier = (config.speed / 50) * 0.45
+            root.CFrame = root.CFrame + (hum.MoveDirection * bypassMultiplier)
         end
         
-        -- Fly-Safe Inf Jump (Hold Space)
+        -- Safe Inf Jump (Climb State)
         if config.infJumpEnabled and UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 35, root.AssemblyLinearVelocity.Z)
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 32, root.AssemblyLinearVelocity.Z)
         end
+        if config.antiRagdoll then hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false); hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end
     end
 end)
 
@@ -91,7 +88,7 @@ local isSliding = false
 local function updateSlider(input)
     local p = math.clamp((input.Position.X - sliderFrame.AbsolutePosition.X) / sliderFrame.AbsoluteSize.X, 0, 1)
     config.speed = math.floor(16 + (p * 34))
-    speedValueLabel.Text = "Speed: " .. tostring(config.speed)
+    speedValueLabel.Text = "Speed: " .. tostring(config.speed) .. " (Safe: <32)"
     sliderFill.Size = UDim2.new(p, 0, 1, 0); knob.Position = UDim2.new(p, -9, 0.5, -9)
 end
 sliderFrame.InputBegan:Connect(function(i) if (i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch) then isSliding = true; updateSlider(i) end end)
@@ -110,8 +107,10 @@ minBox.MouseButton1Click:Connect(function() config.minimized = false; frame.Visi
 
 resB.MouseButton1Click:Connect(function() if player.Character and player.Character:FindFirstChild("Humanoid") then player.Character.Humanoid.Health = 0 end end)
 rejB.MouseButton1Click:Connect(function() TeleportService:Teleport(game.PlaceId, player) end)
+leaB.MouseButton1Click:Connect(function() player:Kick("Left via NoName Hub") end)
 
+-- RAINBOW SYNC
 RunService.RenderStepped:Connect(function()
     local color = Color3.fromHSV(tick() % 5 / 5, 0.8, 1)
-    frameStroke.Color = color; minStroke.Color = color; resS.Color = color; rejS.Color = color; bStr.Color = color; sStr.Color = color; eStr.Color = color; rStr.Color = color; knob.BackgroundColor3 = color; sliderFill.BackgroundColor3 = color
+    frameStroke.Color = color; minStroke.Color = color; resS.Color = color; rejS.Color = color; leaS.Color = color; bStr.Color = color; sStr.Color = color; eStr.Color = color; rStr.Color = color; knob.BackgroundColor3 = color; sliderFill.BackgroundColor3 = color
 end)
