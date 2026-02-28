@@ -6,7 +6,7 @@ local CoreGui = game:GetService("CoreGui")
 
 local FILE_NAME = "NoNameHub.json"
 local boostEnabled = false
-local boostSpeed = 31 -- Safe "Boss" speed
+local boostSpeed = 33 
 
 local function loadPosition()
     if readfile and isfile and isfile(FILE_NAME) then
@@ -118,8 +118,8 @@ credit.TextSize = 8
 credit.TextColor3 = Color3.fromRGB(110,110,110)
 credit.TextXAlignment = Enum.TextXAlignment.Right
 
--- RAINBOW & BYPASS SPEED
-RunService.RenderStepped:Connect(function()
+-- IMPROVED VELOCITY PUSH
+RunService.Heartbeat:Connect(function()
     local color = Color3.fromHSV(tick() % 5 / 5, 1, 1)
     frameStroke.Color = color
     minStroke.Color = color
@@ -131,13 +131,16 @@ RunService.RenderStepped:Connect(function()
 
     if boostEnabled then
         local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
         local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            -- Bypass "Slowdown" by force-writing WalkSpeed every frame
-            hum.WalkSpeed = boostSpeed
-            -- Force "Running" state so the server doesn't think you are falling/lagging
-            if hum:GetState() ~= Enum.HumanoidStateType.Running then
-                hum:ChangeState(Enum.HumanoidStateType.Running)
+        
+        if root and hum then
+            if hum.MoveDirection.Magnitude > 0 then
+                -- Setting AssemblyLinearVelocity is the most "powerful" way to move
+                root.AssemblyLinearVelocity = Vector3.new(hum.MoveDirection.X * boostSpeed, root.AssemblyLinearVelocity.Y, hum.MoveDirection.Z * boostSpeed)
+            else
+                -- Stop instantly to prevent the "sliding" that triggers anti-cheats
+                root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
             end
         end
     end
@@ -147,10 +150,6 @@ end)
 boostBtn.MouseButton1Click:Connect(function()
     boostEnabled = not boostEnabled
     boostBtn.Text = "SPEED BOOST: " .. (boostEnabled and "ON" or "OFF")
-    if not boostEnabled and player.Character then
-        local hum = player.Character:FindFirstChildOfClass("Humanoid")
-        if hum then hum.WalkSpeed = 16 end
-    end
 end)
 
 minBtn.MouseButton1Click:Connect(function()
