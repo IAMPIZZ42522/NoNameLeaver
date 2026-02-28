@@ -6,7 +6,7 @@ local CoreGui = game:GetService("CoreGui")
 
 local FILE_NAME = "NoNameHub.json"
 local boostEnabled = false
-local boostSpeed = 32 -- Perfectly tuned to beat item weight without lagback
+local boostSpeed = 32 
 
 local function loadPosition()
     if readfile and isfile and isfile(FILE_NAME) then
@@ -118,7 +118,11 @@ credit.TextSize = 8
 credit.TextColor3 = Color3.fromRGB(110,110,110)
 credit.TextXAlignment = Enum.TextXAlignment.Right
 
--- THE POWERFUL "MASSLESS" VELOCITY METHOD
+-- BODY VELOCITY STABILIZER
+local bv = Instance.new("BodyVelocity")
+bv.MaxForce = Vector3.new(0, 0, 0) -- Starts disabled
+bv.Velocity = Vector3.new(0, 0, 0)
+
 RunService.Heartbeat:Connect(function()
     local color = Color3.fromHSV(tick() % 5 / 5, 1, 1)
     frameStroke.Color = color
@@ -129,27 +133,18 @@ RunService.Heartbeat:Connect(function()
     rejoinStroke.Color = color
     leaveStroke.Color = color
 
-    if boostEnabled then
-        local char = player.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        
-        if root and hum then
-            if hum.MoveDirection.Magnitude > 0 then
-                -- Make character massless while moving so the "Item Weight" is ignored
-                for _, v in pairs(char:GetDescendants()) do
-                    if v:IsA("BasePart") then v.Massless = true end
-                end
-                
-                -- Inject Velocity directly into the Assembly
-                -- This is smoother than CFrame and prevents the "Rubber-Band"
-                root.AssemblyLinearVelocity = Vector3.new(hum.MoveDirection.X * boostSpeed, root.AssemblyLinearVelocity.Y, hum.MoveDirection.Z * boostSpeed)
-            else
-                -- Return mass when not moving to stay grounded
-                for _, v in pairs(char:GetDescendants()) do
-                    if v:IsA("BasePart") then v.Massless = false end
-                end
-            end
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    
+    if root and hum then
+        bv.Parent = root -- Keep it attached
+        if boostEnabled and hum.MoveDirection.Magnitude > 0 then
+            -- Set force to high on X and Z, but 0 on Y (to let gravity work)
+            bv.MaxForce = Vector3.new(100000, 0, 100000)
+            bv.Velocity = hum.MoveDirection * boostSpeed
+        else
+            bv.MaxForce = Vector3.new(0, 0, 0)
         end
     end
 end)
@@ -158,13 +153,6 @@ end)
 boostBtn.MouseButton1Click:Connect(function()
     boostEnabled = not boostEnabled
     boostBtn.Text = "SPEED BOOST: " .. (boostEnabled and "ON" or "OFF")
-    
-    -- Safety Reset
-    if not boostEnabled and player.Character then
-        for _, v in pairs(player.Character:GetDescendants()) do
-            if v:IsA("BasePart") then v.Massless = false end
-        end
-    end
 end)
 
 minBtn.MouseButton1Click:Connect(function()
