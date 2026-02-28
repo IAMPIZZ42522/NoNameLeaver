@@ -86,10 +86,10 @@ local bBtn, bStr = createToggle("boostEnabled", "SPEED BOOST")
 local lockBtn, lockStr = createUtil(config.sliderLocked and "UNLOCK SLIDER" or "LOCK SLIDER")
 lockBtn.Size = UDim2.new(0.85, 0, 0, 25)
 
--- SLIDER (Fixed Label)
+-- SLIDER (Locked Range)
 local sliderFrame = Instance.new("Frame", scroll); sliderFrame.Size = UDim2.new(0.85, 0, 0, 10); sliderFrame.BackgroundColor3 = Color3.fromRGB(45,45,45); sliderFrame.BorderSizePixel = 0; Instance.new("UICorner", sliderFrame)
-local sliderFill = Instance.new("Frame", sliderFrame); sliderFill.Size = UDim2.new(((config.speed-16)/34), 0, 1, 0); sliderFill.BackgroundColor3 = Color3.new(1,1,1); Instance.new("UICorner", sliderFill)
-local knob = Instance.new("Frame", sliderFrame); knob.Size = UDim2.new(0, 18, 0, 18); knob.Position = UDim2.new(((config.speed-16)/34), -9, 0.5, -9); knob.BackgroundColor3 = Color3.new(1,1,1); Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
+local sliderFill = Instance.new("Frame", sliderFrame); sliderFill.Size = UDim2.new(((config.speed-16)/16), 0, 1, 0); sliderFill.BackgroundColor3 = Color3.new(1,1,1); Instance.new("UICorner", sliderFill)
+local knob = Instance.new("Frame", sliderFrame); knob.Size = UDim2.new(0, 18, 0, 18); knob.Position = UDim2.new(((config.speed-16)/16), -9, 0.5, -9); knob.BackgroundColor3 = Color3.new(1,1,1); Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
 local speedValueLabel = Instance.new("TextLabel", scroll); speedValueLabel.Size = UDim2.new(0.85, 0, 0, 15); speedValueLabel.BackgroundTransparency = 1; speedValueLabel.Text = "Speed: "..config.speed.." (Safe: <32)"; speedValueLabel.Font = Enum.Font.GothamMedium; speedValueLabel.TextSize = 9; speedValueLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
 
 lockBtn.MouseButton1Click:Connect(function()
@@ -103,32 +103,41 @@ local eBtn, eStr = createToggle("espEnabled", "PLAYER ESP")
 local rBtn, rStr = createToggle("antiRagdoll", "ANTI RAGDOLL")
 local kBtn, kStr = createToggle("antiKB", "ANTI KNOCKBACK")
 
--- CORE LOOP (The Speed Logic that worked on 50)
+-- CORE ENGINE
 RunService.Stepped:Connect(function()
     local color = config.sliderLocked and Color3.fromRGB(255, 50, 50) or Color3.fromHSV(tick() % 5 / 5, 0.8, 1)
     frameStroke.Color = color; minStroke.Color = color; knob.BackgroundColor3 = color; sliderFill.BackgroundColor3 = color
     resS.Color = color; rejS.Color = color; leaS.Color = color; bStr.Color = color; lockStr.Color = color; sStr.Color = color; eStr.Color = color; rStr.Color = color; kStr.Color = color
 
-    local char = player.Character; local root = char and char:FindFirstChild("HumanoidRootPart"); local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum and root then
-        if config.boostEnabled and hum.MoveDirection.Magnitude > 0 then
-            -- Direct Velocity Override (Force-resetting momentum to prevent lag-back)
-            root.AssemblyLinearVelocity = (hum.MoveDirection * config.speed) + Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
+    local char = player.Character; local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        -- BASIC SPEED: Using WalkSpeed directly instead of Velocity to reduce lag-back
+        if config.boostEnabled then
+            hum.WalkSpeed = config.speed
+        else
+            hum.WalkSpeed = 16
         end
         if config.antiRagdoll then hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false); hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end
-        if config.antiKB and not config.boostEnabled and not config.infJumpEnabled then 
-            root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0) 
-        end
     end
 end)
 
--- INF JUMP (58 HEIGHT - NO TELEPORT)
-UserInputService.JumpRequest:Connect(function()
-    if config.infJumpEnabled and player.Character then
-        local root = player.Character:FindFirstChild("HumanoidRootPart")
-        if root then 
-            -- Sets velocity to exactly 58 but allows the engine to handle gravity
-            root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 58, root.AssemblyLinearVelocity.Z) 
+-- CLASSIC INF JUMP + HOLD TO JUMP
+local jumping = false
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Space then jumping = true end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Space then jumping = false end
+end)
+
+-- The "Basic" Method loop
+task.spawn(function()
+    while task.wait(0.1) do
+        if config.infJumpEnabled and jumping then
+            local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
         end
     end
 end)
@@ -138,7 +147,7 @@ local isSliding = false
 local function updateSlider(input)
     if config.sliderLocked then return end
     local p = math.clamp((input.Position.X - sliderFrame.AbsolutePosition.X) / sliderFrame.AbsoluteSize.X, 0, 1)
-    config.speed = math.floor(16 + (p * 34))
+    config.speed = math.floor(16 + (p * 16))
     speedValueLabel.Text = "Speed: " .. tostring(config.speed) .. " (Safe: <32)"
     sliderFill.Size = UDim2.new(p, 0, 1, 0); knob.Position = UDim2.new(p, -9, 0.5, -9)
 end
@@ -146,7 +155,7 @@ sliderFrame.InputBegan:Connect(function(i) if (i.UserInputType == Enum.UserInput
 UserInputService.InputChanged:Connect(function(i) if isSliding and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then updateSlider(i) end end)
 UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then isSliding = false; saveSettings() end end)
 
--- ESP & KICK
+-- ESP & UTILS
 local function applyESP(plr)
     if plr == player then return end
     RunService.RenderStepped:Connect(function()
@@ -159,7 +168,6 @@ local function applyESP(plr)
 end
 for _, p in pairs(game.Players:GetPlayers()) do applyESP(p) end
 game.Players.PlayerAdded:Connect(applyESP)
-
 resB.MouseButton1Click:Connect(function() if player.Character and player.Character:FindFirstChild("Humanoid") then player.Character.Humanoid.Health = 0 end end)
 rejB.MouseButton1Click:Connect(function() TeleportService:Teleport(game.PlaceId, player) end)
 leaB.MouseButton1Click:Connect(function() player:Kick("kicked by mrfunnynutz") end)
