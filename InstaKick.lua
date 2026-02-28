@@ -6,7 +6,7 @@ local CoreGui = game:GetService("CoreGui")
 
 local FILE_NAME = "NoNameHub.json"
 local boostEnabled = false
-local boostSpeed = 33 
+local boostSpeed = 32 -- Perfectly tuned to beat item weight without lagback
 
 local function loadPosition()
     if readfile and isfile and isfile(FILE_NAME) then
@@ -118,7 +118,7 @@ credit.TextSize = 8
 credit.TextColor3 = Color3.fromRGB(110,110,110)
 credit.TextXAlignment = Enum.TextXAlignment.Right
 
--- IMPROVED VELOCITY PUSH
+-- THE POWERFUL "MASSLESS" VELOCITY METHOD
 RunService.Heartbeat:Connect(function()
     local color = Color3.fromHSV(tick() % 5 / 5, 1, 1)
     frameStroke.Color = color
@@ -136,11 +136,19 @@ RunService.Heartbeat:Connect(function()
         
         if root and hum then
             if hum.MoveDirection.Magnitude > 0 then
-                -- Setting AssemblyLinearVelocity is the most "powerful" way to move
+                -- Make character massless while moving so the "Item Weight" is ignored
+                for _, v in pairs(char:GetDescendants()) do
+                    if v:IsA("BasePart") then v.Massless = true end
+                end
+                
+                -- Inject Velocity directly into the Assembly
+                -- This is smoother than CFrame and prevents the "Rubber-Band"
                 root.AssemblyLinearVelocity = Vector3.new(hum.MoveDirection.X * boostSpeed, root.AssemblyLinearVelocity.Y, hum.MoveDirection.Z * boostSpeed)
             else
-                -- Stop instantly to prevent the "sliding" that triggers anti-cheats
-                root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
+                -- Return mass when not moving to stay grounded
+                for _, v in pairs(char:GetDescendants()) do
+                    if v:IsA("BasePart") then v.Massless = false end
+                end
             end
         end
     end
@@ -150,6 +158,13 @@ end)
 boostBtn.MouseButton1Click:Connect(function()
     boostEnabled = not boostEnabled
     boostBtn.Text = "SPEED BOOST: " .. (boostEnabled and "ON" or "OFF")
+    
+    -- Safety Reset
+    if not boostEnabled and player.Character then
+        for _, v in pairs(player.Character:GetDescendants()) do
+            if v:IsA("BasePart") then v.Massless = false end
+        end
+    end
 end)
 
 minBtn.MouseButton1Click:Connect(function()
