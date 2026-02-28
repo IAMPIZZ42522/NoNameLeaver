@@ -6,7 +6,7 @@ local CoreGui = game:GetService("CoreGui")
 
 local FILE_NAME = "NoNameHub.json"
 local boostEnabled = false
-local boostSpeed = 31 -- Precision tuned to slip under the radar
+local boostSpeed = 32 -- Perfectly balanced for high speed without the kick
 
 local function loadPosition()
     if readfile and isfile and isfile(FILE_NAME) then
@@ -118,10 +118,8 @@ credit.TextSize = 8
 credit.TextColor3 = Color3.fromRGB(110,110,110)
 credit.TextXAlignment = Enum.TextXAlignment.Right
 
--- MICRO-BURST VELOCITY LOGIC
-local burstCounter = 0
-
-RunService.Heartbeat:Connect(function()
+-- SMOOTH VELOCITY LERP METHOD
+RunService.Stepped:Connect(function()
     local color = Color3.fromHSV(tick() % 5 / 5, 1, 1)
     frameStroke.Color = color
     minStroke.Color = color
@@ -138,14 +136,16 @@ RunService.Heartbeat:Connect(function()
         
         if root and hum then
             if hum.MoveDirection.Magnitude > 0 then
-                burstCounter = burstCounter + 1
+                -- Lerp Velocity: Smoothly transition to 32 speed to avoid "Spike" kicks
+                local targetVel = Vector3.new(hum.MoveDirection.X * boostSpeed, root.AssemblyLinearVelocity.Y, hum.MoveDirection.Z * boostSpeed)
+                root.AssemblyLinearVelocity = root.AssemblyLinearVelocity:Lerp(targetVel, 0.5)
                 
-                -- Only apply force 4 out of every 5 frames
-                -- This "stutters" the velocity so it doesn't look like a constant cheat
-                if burstCounter % 5 ~= 0 then
-                    root.AssemblyLinearVelocity = Vector3.new(hum.MoveDirection.X * boostSpeed, root.AssemblyLinearVelocity.Y, hum.MoveDirection.Z * boostSpeed)
+                -- State Lock: Prevents "Trip" or "Fall" flags while carrying heavy items
+                if hum:GetState() ~= Enum.HumanoidStateType.Running then
+                    hum:ChangeState(Enum.HumanoidStateType.Running)
                 end
             else
+                -- Immediate stop to prevent "Sliding" kicks
                 root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
             end
         end
